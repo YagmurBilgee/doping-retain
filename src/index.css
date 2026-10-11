@@ -1,1 +1,148 @@
 @import "tailwindcss";
+
+/*
+ * Doping Hafıza tasarım sistemi tokenları.
+ * Değerler canlı masaüstü uygulamasının ekran fotoğraflarından çıkarılmıştır;
+ * ekran fotoğrafı kaynaklı renk sapmaları için resmi marka paleti geldiğinde güncellenmelidir.
+ */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Zemin ve yüzeyler */
+  --color-canvas: #eef0f8;
+  --color-canvas-deep: #e6e9f5;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f3f5fb;
+  --color-line: #e4e7f1;
+
+  /* Metin */
+  --color-ink: #1e2340;
+  --color-ink-secondary: #5f6584;
+  --color-ink-muted: #9aa0b8;
+
+  /* Marka */
+  --color-brand: #2f55d4;
+  --color-brand-strong: #2445b8;
+  --color-brand-soft: #e6edfc;
+  --color-navy: #1c2142;
+  --color-coin: #f28c28;
+
+  /* Durum renkleri (Doping Retain risk seviyeleri ile eşleşir) */
+  --color-risk: #f59e0b;
+  --color-risk-soft: #fef3e0;
+  --color-risk-ink: #b45309;
+  --color-danger: #e0453a;
+  --color-danger-soft: #fdecea;
+  --color-danger-ink: #b42318;
+  --color-success: #22a06b;
+  --color-success-soft: #e3f6ec;
+  --color-success-ink: #157a50;
+
+  /* Köşe yarıçapları */
+  --radius-card: 1rem;
+  --radius-tile: 0.75rem;
+
+  /* Kart iç boşluk ritmi */
+  --spacing-card: 1.25rem;
+  --spacing-card-sm: 0.875rem;
+
+  /* Gölgeler */
+  --shadow-card: 0 1px 2px rgb(30 35 64 / 0.04), 0 4px 16px rgb(30 35 64 / 0.06);
+  --shadow-card-hover: 0 2px 4px rgb(30 35 64 / 0.06), 0 8px 24px rgb(30 35 64 / 0.1);
+  --shadow-float: 0 6px 24px rgb(30 35 64 / 0.08);
+}
+
+@layer base {
+  body {
+    @apply bg-canvas font-sans text-ink antialiased;
+    background-image: linear-gradient(180deg, var(--color-canvas) 0%, var(--color-canvas-deep) 100%);
+    background-attachment: fixed;
+  }
+}
+
+/* Kartlar */
+@utility card {
+  @apply rounded-card border border-line bg-surface p-card shadow-card;
+}
+
+@utility card-interactive {
+  @apply transition-shadow hover:shadow-card-hover;
+}
+
+/* Profil kartı gibi koyu lacivert yüzey */
+@utility card-dark {
+  @apply rounded-card bg-navy p-card text-white shadow-card;
+}
+
+/* "Günlük Görevlerim" gibi marka mavisi yüzey */
+@utility card-brand {
+  @apply rounded-card bg-brand p-card text-white shadow-card;
+}
+
+/* "Günün Programı" liste satırı */
+@utility list-row {
+  @apply flex items-center gap-3 rounded-tile bg-surface-muted p-card-sm transition-colors hover:bg-brand-soft;
+}
+
+/* Satır başındaki renkli ikon karesi */
+@utility icon-tile {
+  @apply flex size-10 shrink-0 items-center justify-center rounded-tile;
+}
+
+/* Başlıklar */
+@utility section-title {
+  @apply text-lg font-bold tracking-tight text-ink;
+}
+
+@utility section-subtitle {
+  @apply text-xs font-medium text-ink-muted;
+}
+
+/* Rozetler ve metrik hapları */
+@utility badge {
+  @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap;
+}
+
+@utility badge-brand {
+  @apply bg-brand-soft text-brand;
+}
+
+@utility badge-risk {
+  @apply bg-risk-soft text-risk-ink;
+}
+
+@utility badge-danger {
+  @apply bg-danger-soft text-danger-ink;
+}
+
+@utility badge-success {
+  @apply bg-success-soft text-success-ink;
+}
+
+/* Profil kartındaki "615" coin hapı */
+@utility metric-pill {
+  @apply inline-flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-sm font-bold text-ink shadow-card;
+}
+
+/* Kenar çubuğu navigasyonu */
+@utility nav-item {
+  @apply flex items-center gap-3 rounded-tile px-3 py-2.5 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-muted;
+}
+
+@utility nav-item-active {
+  @apply bg-brand-soft font-semibold text-brand hover:bg-brand-soft;
+}
+
+/* Arama çubuğu */
+@utility search-field {
+  @apply flex items-center gap-3 rounded-card bg-surface px-4 py-3 text-sm text-ink shadow-float placeholder:text-ink-muted;
+}
+
+/* Butonlar */
+@utility btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-tile bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand;
+}
+
+@utility btn-secondary {
+  @apply inline-flex items-center justify-center gap-2 rounded-tile bg-brand-soft px-4 py-2 text-sm font-semibold text-brand transition-colors hover:bg-brand-soft/70;
+}

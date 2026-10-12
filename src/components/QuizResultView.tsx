@@ -39,6 +39,7 @@ const TIER_COPY: Record<ReviewTier, { icon: LucideIcon; badge: string; tile: str
 function QuizResultView({ topic, score, total, outcome, onFinish }: QuizResultViewProps) {
   const before = getTopicRisk(topic)
   const after = getTopicRisk(outcome.updatedTopic)
+  const afterPresentation = getRiskPresentation(after)
   const { review, retentionAtNextReview, retentionGain } = outcome
   const copy = TIER_COPY[review.tier]
   const TierIcon = copy.icon
@@ -71,13 +72,13 @@ function QuizResultView({ topic, score, total, outcome, onFinish }: QuizResultVi
 
         <div className="flex flex-col items-center gap-1.5" aria-hidden="true">
           <ArrowRight size={18} className="text-ink-muted" />
-          <span className="badge badge-success motion-safe:animate-pop-in">+{retentionGain} puan</span>
+          <span className={`badge ${afterPresentation.badge} motion-safe:animate-pop-in`}>+{retentionGain} puan</span>
         </div>
 
         <RetentionRing
           caption="Sonra"
           retention={after.retention}
-          presentation={getRiskPresentation(after)}
+          presentation={afterPresentation}
           strengthDays={review.newStrength}
           isStrengthened
         />

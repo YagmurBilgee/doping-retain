@@ -1,7 +1,7 @@
-import { useEffect, useRef, type MouseEvent, type SyntheticEvent } from 'react'
-import { Lightbulb, X } from 'lucide-react'
+import { Lightbulb } from 'lucide-react'
 import type { Topic } from '../types'
 import { getTopicRisk } from '../utils/memoryModel'
+import ModalShell from './ModalShell'
 import { RISK_PRESENTATION } from './riskPresentation'
 
 interface TopicDetailModalProps {
@@ -13,10 +13,6 @@ interface TopicDetailModalProps {
   reviewMinutes?: number
 }
 
-/**
- * Built on the native <dialog> element: showModal() provides focus trapping,
- * Escape handling and top-layer rendering without a portal.
- */
 function TopicDetailModal({
   isOpen,
   topic,
@@ -24,57 +20,18 @@ function TopicDetailModal({
   onStartQuiz,
   reviewMinutes = 5,
 }: TopicDetailModalProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null)
-  const shouldShow = isOpen && topic !== undefined
-
-  useEffect(() => {
-    const dialog = dialogRef.current
-    if (!dialog) return
-
-    if (shouldShow && !dialog.open) dialog.showModal()
-    if (!shouldShow && dialog.open) dialog.close()
-  }, [shouldShow])
-
-  useEffect(() => {
-    if (!shouldShow) return
-
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = previousOverflow
-    }
-  }, [shouldShow])
-
-  const handleCancel = (event: SyntheticEvent<HTMLDialogElement>) => {
-    // Keep open state owned by the parent instead of letting Escape close it natively.
-    event.preventDefault()
-    onClose()
-  }
-
-  const handleBackdropClick = (event: MouseEvent<HTMLDialogElement>) => {
-    if (event.target === event.currentTarget) onClose()
-  }
-
-  const questionCount = topic?.quiz?.length ?? 0
-
   return (
-    <dialog
-      ref={dialogRef}
-      aria-labelledby="topic-detail-title"
-      onCancel={handleCancel}
-      onClick={handleBackdropClick}
-      className="m-auto w-[calc(100%-2rem)] max-w-lg bg-transparent p-0 backdrop:bg-ink/40 backdrop:backdrop-blur-xs"
-    >
+    <ModalShell isOpen={isOpen && topic !== undefined} onClose={onClose} labelledBy="topic-detail-title">
       {topic && (
         <TopicDetailContent
           topic={topic}
-          questionCount={questionCount}
+          questionCount={topic.quiz?.length ?? 0}
           reviewMinutes={reviewMinutes}
           onClose={onClose}
           onStartQuiz={() => onStartQuiz(topic.id)}
         />
       )}
-    </dialog>
+    </ModalShell>
   )
 }
 
@@ -97,16 +54,7 @@ function TopicDetailContent({
   const risk = RISK_PRESENTATION[riskLevel]
 
   return (
-    <div className="card relative p-card shadow-float">
-      <button
-        type="button"
-        aria-label="Kapat"
-        onClick={onClose}
-        className="absolute top-4 right-4 flex size-8 items-center justify-center rounded-full text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-      >
-        <X size={18} />
-      </button>
-
+    <>
       <header className="pr-10">
         <span className="badge badge-brand">{topic.category}</span>
         <h2 id="topic-detail-title" className="mt-2 text-2xl font-bold tracking-tight text-ink">
@@ -158,7 +106,7 @@ function TopicDetailContent({
           {questionCount} Soruluk Pekiştirme Testine Başla
         </button>
       </footer>
-    </div>
+    </>
   )
 }
 

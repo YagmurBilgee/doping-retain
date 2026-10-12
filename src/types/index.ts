@@ -29,8 +29,20 @@ export interface TopicRisk {
   riskLevel: RiskLevel
 }
 
+/** Score band of a micro-review: 3/3, at least 2/3, or below */
+export type ReviewTier = 'perfect' | 'partial' | 'weak'
+
 export interface ReviewResult {
   /** Updated memory stability S in days */
   newStrength: number
   nextReviewInDays: number
+  tier: ReviewTier
+}
+
+export interface ReviewOutcome {
+  /** Topic after the review: new stability, studied today, review counted */
+  updatedTopic: Topic
+  review: ReviewResult
+  /** Predicted retention on the day of the next scheduled review */
+  retentionAtNextReview: number
 }

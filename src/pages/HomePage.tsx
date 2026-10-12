@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import MemoryRiskCard from '../components/MemoryRiskCard'
+import MiniQuizModal from '../components/MiniQuizModal'
 import Sidebar from '../components/Sidebar'
 import TopBar from '../components/TopBar'
 import TopicDetailModal from '../components/TopicDetailModal'
@@ -10,22 +11,30 @@ import MiniCalendar from '../components/home/MiniCalendar'
 import PerformanceChart from '../components/home/PerformanceChart'
 import ProfileBanner from '../components/home/ProfileBanner'
 import RecentActivities from '../components/home/RecentActivities'
-import { featuredTopic, mockTopics } from '../data/mockTopics'
-import { getTopicRisk } from '../utils/memoryModel'
-
-const HIGH_RISK_COUNT = mockTopics.filter((topic) => getTopicRisk(topic).riskLevel === 'high_risk').length
+import { mockTopics } from '../data/mockTopics'
+import type { ReviewOutcome } from '../types'
+import { countHighRiskTopics, findHighestRiskTopic } from '../utils/memoryModel'
 
 function HomePage() {
+  const [topics, setTopics] = useState(mockTopics)
   const [pendingReviewTopicId, setPendingReviewTopicId] = useState<string | null>(null)
-  // Phase 7 will open the quiz modal for this topic.
   const [quizTopicId, setQuizTopicId] = useState<string | null>(null)
+  const [lastReview, setLastReview] = useState<ReviewOutcome>()
 
-  const pendingReviewTopic = mockTopics.find((topic) => topic.id === pendingReviewTopicId)
+  const riskTopic = findHighestRiskTopic(topics)
+  const pendingReviewTopic = topics.find((topic) => topic.id === pendingReviewTopicId)
+  const quizTopic = topics.find((topic) => topic.id === quizTopicId)
 
   const handleStartQuiz = (topicId: string) => {
-    console.info('[Doping Retain] Quiz requested:', topicId)
     setPendingReviewTopicId(null)
     setQuizTopicId(topicId)
+  }
+
+  const handleQuizComplete = (outcome: ReviewOutcome) => {
+    const { updatedTopic } = outcome
+    setTopics((current) => current.map((topic) => (topic.id === updatedTopic.id ? updatedTopic : topic)))
+    setLastReview(outcome)
+    setQuizTopicId(null)
   }
 
   return (
@@ -49,15 +58,11 @@ function HomePage() {
             <JourneyCard />
             <MiniCalendar />
             <MemoryRiskCard
-              topic={featuredTopic}
-              highRiskCount={HIGH_RISK_COUNT}
-              onStartReview={() => setPendingReviewTopicId(featuredTopic.id)}
+              topic={riskTopic}
+              highRiskCount={countHighRiskTopics(topics)}
+              lastReview={lastReview}
+              onStartReview={setPendingReviewTopicId}
             />
-            {quizTopicId && (
-              <p className="badge badge-brand self-start" role="status">
-                Pekiştirme testi hazırlanıyor…
-              </p>
-            )}
             <DailyProgram />
           </aside>
         </div>
@@ -69,6 +74,15 @@ function HomePage() {
         onClose={() => setPendingReviewTopicId(null)}
         onStartQuiz={handleStartQuiz}
       />
+
+      {quizTopic && (
+        <MiniQuizModal
+          key={quizTopic.id}
+          topic={quizTopic}
+          onClose={() => setQuizTopicId(null)}
+          onComplete={handleQuizComplete}
+        />
+      )}
     </div>
   )
 }

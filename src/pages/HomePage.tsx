@@ -47,7 +47,7 @@ function HomePage() {
   }, [])
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex flex-1">
       <Sidebar />
 
       <div className="flex min-w-0 flex-1 flex-col gap-6 p-4 sm:p-6">

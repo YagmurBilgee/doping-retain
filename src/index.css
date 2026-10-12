@@ -38,6 +38,24 @@
   --color-success-soft: #e3f6ec;
   --color-success-ink: #157a50;
 
+  /* Logo */
+  --color-logo-navy: #1e3a8a;
+  --color-logo-red: #dc2626;
+
+  /* Kenar çubuğu: aktif hap ve menü ikon kareleri (masaüstü uygulamasından) */
+  --color-nav-active: #dce7fd;
+  --color-nav-active-ink: #1e3a8a;
+  --color-nav-blue: #3b6fd8;
+  --color-nav-terracotta: #c8734a;
+  --color-nav-green: #34a36b;
+  --color-nav-sky: #4aa8e0;
+  --color-nav-video: #3a7bd5;
+  --color-nav-amber: #f2a93b;
+  --color-nav-orchid: #c084d8;
+  --color-nav-mauve: #a5679b;
+  --color-nav-teal: #2bb3a6;
+  --color-nav-coral: #ef6b6b;
+
   /* Köşe yarıçapları */
   --radius-card: 1rem;
   --radius-tile: 0.75rem;
@@ -166,11 +184,11 @@
 
 /* Kenar çubuğu navigasyonu */
 @utility nav-item {
-  @apply flex items-center gap-3 rounded-tile px-3 py-2.5 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-muted;
+  @apply flex items-center gap-2.5 rounded-tile px-2.5 py-2 text-[13px] whitespace-nowrap text-ink transition-colors hover:bg-surface-muted;
 }
 
 @utility nav-item-active {
-  @apply bg-brand-soft font-semibold text-brand hover:bg-brand-soft;
+  @apply bg-nav-active font-medium text-nav-active-ink hover:bg-nav-active;
 }
 
 /* Arama çubuğu */

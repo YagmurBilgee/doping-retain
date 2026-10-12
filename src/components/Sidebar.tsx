@@ -1,5 +1,6 @@
 import {
   Activity,
+  Bird,
   BookOpen,
   Bot,
   ChevronDown,
@@ -7,30 +8,31 @@ import {
   FileCheck2,
   LayoutGrid,
   MonitorPlay,
-  Orbit,
-  Radio,
-  UsersRound,
+  Smartphone,
+  Video,
   type LucideIcon,
 } from 'lucide-react'
+import Logo from './Logo'
 
 interface NavItem {
   label: string
   icon: LucideIcon
-  tint: string
+  tile: string
   hasSubmenu?: boolean
 }
 
+/* Order, labels and tile colors follow the Doping Hafıza Desktop client. */
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Ana Sayfa', icon: LayoutGrid, tint: 'bg-brand text-white' },
-  { label: 'Dersler', icon: BookOpen, tint: 'bg-risk-soft text-risk-ink' },
-  { label: 'Testler ve Denemeler', icon: FileCheck2, tint: 'bg-success-soft text-success-ink' },
-  { label: 'WAY Evreni', icon: Orbit, tint: 'bg-brand-soft text-brand' },
-  { label: 'Rehberlik Videoları', icon: MonitorPlay, tint: 'bg-brand-soft text-brand' },
-  { label: 'İstatistikler', icon: Activity, tint: 'bg-risk-soft text-risk-ink' },
-  { label: 'Akıllı Değerlendirme Paneli', icon: Bot, tint: 'bg-danger-soft text-danger-ink' },
-  { label: 'Bire Bir Uygulamalar', icon: UsersRound, tint: 'bg-brand-soft text-brand', hasSubmenu: true },
-  { label: 'Yardım Merkezi', icon: CircleHelp, tint: 'bg-success-soft text-success-ink' },
-  { label: 'Canlı Etkinlikler', icon: Radio, tint: 'bg-danger-soft text-danger-ink' },
+  { label: 'Ana Sayfa', icon: LayoutGrid, tile: 'bg-nav-blue' },
+  { label: 'Dersler', icon: BookOpen, tile: 'bg-nav-terracotta' },
+  { label: 'Testler ve Denemeler', icon: FileCheck2, tile: 'bg-nav-green' },
+  { label: 'WAY Evreni', icon: Bird, tile: 'bg-nav-sky' },
+  { label: 'Rehberlik Videoları', icon: MonitorPlay, tile: 'bg-nav-video' },
+  { label: 'İstatistikler', icon: Activity, tile: 'bg-nav-amber' },
+  { label: 'Akıllı Değerlendirme Paneli', icon: Bot, tile: 'bg-nav-orchid' },
+  { label: 'Bire Bir Uygulamalar', icon: Smartphone, tile: 'bg-nav-mauve', hasSubmenu: true },
+  { label: 'Yardım Merkezi', icon: CircleHelp, tile: 'bg-nav-teal' },
+  { label: 'Canlı Etkinlikler', icon: Video, tile: 'bg-nav-coral' },
 ]
 
 interface SidebarProps {
@@ -39,18 +41,14 @@ interface SidebarProps {
 
 function Sidebar({ activeLabel = 'Ana Sayfa' }: SidebarProps) {
   return (
-    <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col gap-6 overflow-y-auto bg-surface px-4 py-6 shadow-card lg:flex">
+    <aside className="sticky top-7 hidden h-[calc(100vh-1.75rem)] w-[260px] shrink-0 flex-col gap-6 overflow-y-auto border-r border-line bg-surface px-3 py-5 lg:flex">
       <div className="px-2">
-        <p className="text-2xl font-extrabold tracking-tight">
-          <span className="text-danger">doping</span>
-          <span className="text-brand">hafıza</span>
-        </p>
-        <p className="section-subtitle">öğrenmenin dijital hali</p>
+        <Logo />
       </div>
 
       <nav aria-label="Ana menü">
-        <ul className="flex flex-col gap-1">
-          {NAV_ITEMS.map(({ label, icon: Icon, tint, hasSubmenu }) => {
+        <ul className="flex flex-col gap-0.5">
+          {NAV_ITEMS.map(({ label, icon: Icon, tile, hasSubmenu }) => {
             const isActive = label === activeLabel
             return (
               <li key={label}>
@@ -59,11 +57,11 @@ function Sidebar({ activeLabel = 'Ana Sayfa' }: SidebarProps) {
                   className={`nav-item ${isActive ? 'nav-item-active' : ''}`}
                   aria-current={isActive ? 'page' : undefined}
                 >
-                  <span className={`icon-tile size-8 rounded-lg ${tint}`} aria-hidden="true">
-                    <Icon size={16} />
+                  <span className={`icon-tile size-7 rounded-lg text-white ${tile}`} aria-hidden="true">
+                    <Icon size={15} strokeWidth={2.25} />
                   </span>
-                  <span className="flex-1">{label}</span>
-                  {hasSubmenu && <ChevronDown size={16} aria-hidden="true" />}
+                  <span className="min-w-0 flex-1 truncate">{label}</span>
+                  {hasSubmenu && <ChevronDown size={14} className="shrink-0 text-ink-secondary" aria-hidden="true" />}
                 </a>
               </li>
             )

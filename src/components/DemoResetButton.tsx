@@ -24,7 +24,7 @@ function DemoResetButton({ onReset }: DemoResetButtonProps) {
       type="button"
       onClick={onReset}
       title="Demoyu sıfırla (Alt+Shift+R)"
-      className="fixed bottom-4 left-4 z-10 inline-flex items-center gap-1.5 rounded-full bg-surface/80 px-3 py-1.5 text-xs font-medium text-ink-muted opacity-60 shadow-card backdrop-blur-xs transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-brand"
+      className="fixed right-4 bottom-4 z-10 inline-flex items-center gap-1.5 rounded-full bg-surface/80 px-3 py-1.5 text-xs font-medium text-ink-muted opacity-60 shadow-card backdrop-blur-xs transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-brand"
     >
       <RotateCcw size={12} aria-hidden="true" />
       Demoyu Sıfırla

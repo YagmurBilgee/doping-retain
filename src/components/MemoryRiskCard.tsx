@@ -1,6 +1,7 @@
 import { BrainCircuit, Triangle } from 'lucide-react'
-import type { RiskLevel, Topic } from '../types'
+import type { Topic } from '../types'
 import { getTopicRisk } from '../utils/memoryModel'
+import { RISK_PRESENTATION } from './riskPresentation'
 
 interface MemoryRiskCardProps {
   topic: Topic
@@ -11,12 +12,6 @@ interface MemoryRiskCardProps {
   onStartReview?: () => void
 }
 
-const RISK_STYLES: Record<RiskLevel, { badge: string; bar: string }> = {
-  high_risk: { badge: 'badge-danger', bar: 'bg-danger' },
-  review_soon: { badge: 'badge-risk', bar: 'bg-risk' },
-  safe: { badge: 'badge-success', bar: 'bg-success' },
-}
-
 function MemoryRiskCard({
   topic,
   highRiskCount,
@@ -24,7 +19,7 @@ function MemoryRiskCard({
   onStartReview,
 }: MemoryRiskCardProps) {
   const { retention, riskLevel } = getTopicRisk(topic)
-  const styles = RISK_STYLES[riskLevel]
+  const styles = RISK_PRESENTATION[riskLevel]
 
   return (
     <section className="card" aria-labelledby="memory-risk-title">

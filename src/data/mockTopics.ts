@@ -17,6 +17,11 @@ export const featuredTopic: Topic = {
   previousSuccessRate: 0.72,
   reviewCount: 1,
   currentStrength: 14,
+  summaryPoints: [
+    'sin²x + cos²x = 1',
+    'tan x = sin x / cos x',
+    'Temel dar açı değerleri: sin 30° = 1/2, cos 60° = 1/2',
+  ],
   quiz: [
     {
       id: 'trig-q1',

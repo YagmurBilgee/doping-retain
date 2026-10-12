@@ -17,6 +17,8 @@ export interface Topic {
   reviewCount: number
   /** Memory stability S in days, used in Retention = e^(-t / S) */
   currentStrength: number
+  /** Key recall points shown before the micro-review quiz */
+  summaryPoints?: string[]
   /** Mini-quiz for the micro-review flow */
   quiz?: QuizQuestion[]
 }

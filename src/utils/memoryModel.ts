@@ -11,7 +11,7 @@ import type { ReviewResult, RiskLevel } from '../types'
  */
 
 export const SAFE_THRESHOLD = 70
-export const HIGH_RISK_THRESHOLD = 40
+export const HIGH_RISK_THRESHOLD = 50
 
 const REVIEW_RULES = {
   perfect: { strengthMultiplier: 2, nextReviewInDays: 14 },

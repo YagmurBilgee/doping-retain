@@ -3,7 +3,7 @@ import type { Topic } from '../types'
 /*
  * Stability (S) values are calibrated so calculateRetention() lands on the
  * intended risk band:
- *   Trigonometri      t=11, S=14 → 46% (review_soon)
+ *   Trigonometri      t=11, S=14 → 46% (high_risk)
  *   Hücre Bölünmeleri t=6,  S=10 → 55% (review_soon)
  *   Sözcükte Anlam    t=3,  S=20 → 86% (safe)
  *   Fonksiyonlar      t=8,  S=12 → 51% (review_soon)

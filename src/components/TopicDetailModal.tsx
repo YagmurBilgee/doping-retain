@@ -87,12 +87,16 @@ function TopicDetailContent({
             Hızlı Hatırlatma
           </h3>
           <ol className="mt-3 flex flex-col gap-2">
-            {topic.summaryPoints.map((point, index) => (
-              <li key={point} className="list-row">
-                <span className="icon-tile size-8 bg-brand text-sm font-bold text-white" aria-hidden="true">
-                  {index + 1}
+            {topic.summaryPoints.map(({ icon, tag, text, note }) => (
+              <li key={tag} className="list-row items-start">
+                <span className="icon-tile size-9 bg-surface text-lg shadow-card" aria-hidden="true">
+                  {icon}
                 </span>
-                <p className="text-sm font-semibold text-ink">{point}</p>
+                <div className="min-w-0 flex-1">
+                  <span className="badge badge-brand">{tag}</span>
+                  <p className="mt-1 text-base font-bold tracking-tight text-ink">{text}</p>
+                  {note && <p className="text-xs text-ink-secondary">{note}</p>}
+                </div>
               </li>
             ))}
           </ol>

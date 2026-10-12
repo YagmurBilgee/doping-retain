@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useRef } from 'react'
-import { Check, X } from 'lucide-react'
+import { Check, Lightbulb, X } from 'lucide-react'
 import type { ReviewOutcome, Topic } from '../types'
 import { applyReviewResult } from '../utils/memoryModel'
 import ModalShell from './ModalShell'
@@ -170,16 +170,26 @@ function QuestionStep({ topic, index, selected, total, onSelect, onNext }: Quest
         })}
       </ul>
 
-      <p className="mt-4 min-h-5 text-sm font-semibold" role="status">
+      <div className="mt-4 min-h-5" role="status">
         {isAnswered &&
           (isCorrect ? (
-            <span className="text-success-ink">Doğru! Harika gidiyorsun.</span>
+            <p className="text-sm font-semibold text-success-ink">Doğru! Harika gidiyorsun.</p>
           ) : (
-            <span className="text-danger-ink">
-              Yanlış. Doğru cevap: {OPTION_LETTERS[question.correctIndex]}) {question.options[question.correctIndex]}
-            </span>
+            <>
+              <p className="text-sm font-semibold text-danger-ink">
+                Yanlış. Doğru cevap: {OPTION_LETTERS[question.correctIndex]}) {question.options[question.correctIndex]}
+              </p>
+              {question.explanation && (
+                <p className="mt-2 flex gap-2 rounded-tile bg-brand-soft p-card-sm text-sm text-ink motion-safe:animate-fade-in">
+                  <Lightbulb size={16} className="mt-0.5 shrink-0 text-brand" aria-hidden="true" />
+                  <span>
+                    <strong className="font-semibold text-brand">Çözüm İpucu:</strong> {question.explanation}
+                  </span>
+                </p>
+              )}
+            </>
           ))}
-      </p>
+      </div>
 
       <footer className="mt-4 flex justify-end">
         <button ref={nextButtonRef} type="button" className="btn-primary disabled:opacity-50" onClick={onNext} disabled={!isAnswered}>

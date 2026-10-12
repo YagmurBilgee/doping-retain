@@ -1,5 +1,5 @@
 import { ArrowRight, CalendarCheck, Clock, PartyPopper, TrendingUp, type LucideIcon } from 'lucide-react'
-import type { ReviewOutcome, ReviewTier, Topic } from '../types'
+import type { ReviewOutcome, ReviewTier, RiskLevel, Topic } from '../types'
 import { getTopicRisk } from '../utils/memoryModel'
 import { getRiskPresentation, type RiskPresentation } from './riskPresentation'
 
@@ -18,7 +18,7 @@ const TIER_COPY: Record<ReviewTier, { icon: LucideIcon; badge: string; tile: str
     badge: 'badge-success',
     tile: 'bg-success-soft text-success',
     headline: 'Tebrikler! Konuyu Hafızana Sabitledin',
-    message: 'Tüm soruları doğru yanıtladın. Bellek gücün iki katına çıktı.',
+    message: 'Tüm soruları doğru yanıtladın. Bu konu artık çok daha kalıcı.',
   },
   partial: {
     icon: TrendingUp,
@@ -34,6 +34,25 @@ const TIER_COPY: Record<ReviewTier, { icon: LucideIcon; badge: string; tile: str
     headline: 'İyi Başlangıç! Konuyu Takibe Aldık',
     message: 'Bu konu biraz daha ilgi istiyor. İki gün sonra yeniden hatırlatacağız.',
   },
+}
+
+interface PersistenceLabel {
+  text: string
+  tone: string
+  icon?: LucideIcon
+}
+
+/** Student-friendly persistence wording instead of raw stability days. */
+const PERSISTENCE_BEFORE: Record<RiskLevel, PersistenceLabel> = {
+  high_risk: { text: 'Kalıcılık: Düşük', tone: 'text-ink-secondary' },
+  review_soon: { text: 'Kalıcılık: Orta', tone: 'text-ink-secondary' },
+  safe: { text: 'Kalıcılık: Yüksek', tone: 'text-ink-secondary' },
+}
+
+const PERSISTENCE_AFTER: Record<ReviewTier, PersistenceLabel> = {
+  perfect: { text: 'Kalıcılık: Güçlendirildi', tone: 'font-semibold text-success-ink', icon: TrendingUp },
+  partial: { text: 'Kalıcılık: Güçlendirildi', tone: 'font-semibold text-success-ink', icon: TrendingUp },
+  weak: { text: 'Kalıcılık: Takip Ediliyor', tone: 'font-semibold text-risk-ink', icon: Clock },
 }
 
 function QuizResultView({ topic, score, total, outcome, onFinish }: QuizResultViewProps) {
@@ -67,7 +86,7 @@ function QuizResultView({ topic, score, total, outcome, onFinish }: QuizResultVi
           caption="Önce"
           retention={before.retention}
           presentation={getRiskPresentation(before)}
-          strengthDays={topic.currentStrength}
+          persistence={PERSISTENCE_BEFORE[before.riskLevel]}
         />
 
         <div className="flex flex-col items-center gap-1.5" aria-hidden="true">
@@ -79,8 +98,7 @@ function QuizResultView({ topic, score, total, outcome, onFinish }: QuizResultVi
           caption="Sonra"
           retention={after.retention}
           presentation={afterPresentation}
-          strengthDays={review.newStrength}
-          isStrengthened
+          persistence={PERSISTENCE_AFTER[review.tier]}
         />
       </section>
 
@@ -105,11 +123,12 @@ interface RetentionRingProps {
   caption: string
   retention: number
   presentation: RiskPresentation
-  strengthDays: number
-  isStrengthened?: boolean
+  persistence: PersistenceLabel
 }
 
-function RetentionRing({ caption, retention, presentation, strengthDays, isStrengthened = false }: RetentionRingProps) {
+function RetentionRing({ caption, retention, presentation, persistence }: RetentionRingProps) {
+  const PersistenceIcon = persistence.icon
+
   return (
     <div className="flex flex-col items-center text-center">
       <p className="section-subtitle">{caption}</p>
@@ -135,13 +154,9 @@ function RetentionRing({ caption, retention, presentation, strengthDays, isStren
         </span>
       </div>
       <span className={`badge ${presentation.badge} mt-2`}>{presentation.label}</span>
-      <p
-        className={`mt-1.5 flex items-center gap-1 text-xs ${
-          isStrengthened ? 'font-semibold text-success-ink' : 'text-ink-secondary'
-        }`}
-      >
-        {isStrengthened && <TrendingUp size={12} aria-hidden="true" />}
-        Bellek gücü: {strengthDays.toLocaleString('tr-TR')} gün
+      <p className={`mt-1.5 flex items-center gap-1 text-xs ${persistence.tone}`}>
+        {PersistenceIcon && <PersistenceIcon size={12} aria-hidden="true" />}
+        {persistence.text}
       </p>
     </div>
   )

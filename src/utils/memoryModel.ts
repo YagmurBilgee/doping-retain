@@ -2,29 +2,39 @@ import type { ReviewOutcome, ReviewResult, ReviewTier, RiskLevel, Topic, TopicRi
 
 /*
  * Rule-based MVP memory model built on the Ebbinghaus forgetting curve:
- *   Retention = e^(-t / S)
- *   t = days since last study, S = memory stability in days.
+ *   Retention = R0 · e^(-t / S)
+ *   t  = days since last study, S = memory stability in days,
+ *   R0 = initial recall right after that study session (1 by default; after a
+ *        micro-review it reflects the quiz score, so a weak review does not
+ *        pretend the topic is fully remembered).
  *
- * The thresholds and multipliers below are hand-picked MVP approximations,
- * not values fitted to real student data. They are meant to be replaced by
- * a calibrated model (e.g. SM-2 / FSRS style) once review history exists.
+ * The thresholds, multipliers and recall targets below are hand-picked MVP
+ * approximations, not values fitted to real student data. They are meant to be
+ * replaced by a calibrated model (e.g. SM-2 / FSRS style) once review history exists.
  */
 
 export const SAFE_THRESHOLD = 70
 export const HIGH_RISK_THRESHOLD = 50
 
-const REVIEW_RULES: Record<ReviewTier, { strengthMultiplier: number; nextReviewInDays: number }> = {
-  perfect: { strengthMultiplier: 2, nextReviewInDays: 14 },
-  partial: { strengthMultiplier: 1.4, nextReviewInDays: 7 },
-  weak: { strengthMultiplier: 1.05, nextReviewInDays: 2 },
+interface ReviewRule {
+  strengthMultiplier: number
+  nextReviewInDays: number
+  /** Initial recall R0 right after the review */
+  postReviewRecall: number
+}
+
+const REVIEW_RULES: Record<ReviewTier, ReviewRule> = {
+  perfect: { strengthMultiplier: 2, nextReviewInDays: 14, postReviewRecall: 1 },
+  partial: { strengthMultiplier: 1.4, nextReviewInDays: 7, postReviewRecall: 0.8 },
+  weak: { strengthMultiplier: 1.05, nextReviewInDays: 2, postReviewRecall: 0.58 },
 }
 
 /** Returns retention as an integer percentage (0–100). */
-export function calculateRetention(daysAgo: number, strength: number): number {
+export function calculateRetention(daysAgo: number, strength: number, initialRecall = 1): number {
   if (strength <= 0) return 0
 
   const t = Math.max(0, daysAgo)
-  const retention = Math.exp(-t / strength) * 100
+  const retention = initialRecall * Math.exp(-t / strength) * 100
 
   return Math.min(100, Math.max(0, Math.round(retention)))
 }
@@ -38,12 +48,13 @@ export function getRiskLevel(retentionPercentage: number): RiskLevel {
 /**
  * Convenience wrapper so UI components never touch the formula directly.
  * A topic flagged for follow-up (weak last review) is never reported as safe:
- * it stays in review_soon until a stronger review clears the flag.
+ * it is held in review_soon until a stronger review clears the flag, and only
+ * falls to high_risk if the curve itself drops that far.
  */
 export function getTopicRisk(topic: Topic): TopicRisk {
-  const retention = calculateRetention(topic.lastStudiedDaysAgo, topic.currentStrength)
+  const retention = calculateRetention(topic.lastStudiedDaysAgo, topic.currentStrength, topic.initialRecall)
   const curveLevel = getRiskLevel(retention)
-  const isFollowUp = topic.needsFollowUp === true && curveLevel === 'safe'
+  const isFollowUp = topic.needsFollowUp === true && curveLevel !== 'high_risk'
 
   return { retention, riskLevel: isFollowUp ? 'review_soon' : curveLevel, isFollowUp }
 }
@@ -71,8 +82,9 @@ export function calculateNextReview(
 
 /**
  * Applies a finished micro-review to a topic: stability grows per the review
- * rules, the topic counts as studied today (t = 0), the success rate becomes
- * a running average across reviews, and a weak score flags it for follow-up.
+ * rules, the topic counts as studied today (t = 0) with an initial recall set by
+ * the score, the success rate becomes a running average across reviews, and a
+ * weak score flags it for follow-up.
  */
 export function applyReviewResult(topic: Topic, quizScore: number, totalQuestions: number): ReviewOutcome {
   const review = calculateNextReview(quizScore, totalQuestions, topic.currentStrength)
@@ -81,18 +93,25 @@ export function applyReviewResult(topic: Topic, quizScore: number, totalQuestion
   const previousSuccessRate =
     Math.round(((topic.previousSuccessRate * topic.reviewCount + ratio) / reviewCount) * 100) / 100
 
+  const retentionBefore = getTopicRisk(topic).retention
+  // A review never leaves the student worse off than before it.
+  const initialRecall = Math.max(REVIEW_RULES[review.tier].postReviewRecall, retentionBefore / 100)
+
+  const updatedTopic: Topic = {
+    ...topic,
+    currentStrength: review.newStrength,
+    lastStudiedDaysAgo: 0,
+    initialRecall,
+    reviewCount,
+    previousSuccessRate,
+    needsFollowUp: review.tier === 'weak',
+  }
+
   return {
-    updatedTopic: {
-      ...topic,
-      currentStrength: review.newStrength,
-      lastStudiedDaysAgo: 0,
-      reviewCount,
-      previousSuccessRate,
-      needsFollowUp: review.tier === 'weak',
-    },
+    updatedTopic,
     review,
-    retentionAtNextReview: calculateRetention(review.nextReviewInDays, review.newStrength),
-    retentionGain: calculateRetention(0, review.newStrength) - calculateRetention(topic.lastStudiedDaysAgo, topic.currentStrength),
+    retentionAtNextReview: calculateRetention(review.nextReviewInDays, review.newStrength, initialRecall),
+    retentionGain: getTopicRisk(updatedTopic).retention - retentionBefore,
   }
 }
 

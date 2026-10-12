@@ -18,9 +18,9 @@ export const featuredTopic: Topic = {
   reviewCount: 1,
   currentStrength: 14,
   summaryPoints: [
-    'sin²x + cos²x = 1',
-    'tan x = sin x / cos x',
-    'Temel dar açı değerleri: sin 30° = 1/2, cos 60° = 1/2',
+    { icon: '📌', tag: 'Temel Özdeşlik', text: 'sin²x + cos²x = 1', note: 'Kareler toplamı daima 1’dir.' },
+    { icon: '💡', tag: 'Oran Kuralı', text: 'tan x = sin x / cos x' },
+    { icon: '⚡', tag: 'Sık Karıştırılan', text: 'sin 30° = cos 60° = 1/2' },
   ],
   quiz: [
     {
@@ -28,18 +28,21 @@ export const featuredTopic: Topic = {
       question: 'sin 30° · cos 60° + cos 30° · sin 60° işleminin sonucu kaçtır?',
       options: ['1/2', '√3/2', '0', '1'],
       correctIndex: 3,
+      explanation: 'sin 30° · cos 60° + cos 30° · sin 60° = sin(30° + 60°) = sin 90° = 1',
     },
     {
       id: 'trig-q2',
       question: 'x dar açı ve tan x = 3/4 olduğuna göre, sin x kaçtır?',
       options: ['3/5', '4/5', '3/4', '5/3'],
       correctIndex: 0,
+      explanation: 'tan x = 3/4 → kenarlar 3 ve 4, hipotenüs 5 (3-4-5 üçgeni) → sin x = karşı / hipotenüs = 3/5',
     },
     {
       id: 'trig-q3',
       question: 'cos 2x ifadesi aşağıdakilerden hangisine eşittir?',
       options: ['2 · sin x · cos x', '1 − 2sin²x', 'sin²x + cos²x', '2cos²x + 1'],
       correctIndex: 1,
+      explanation: 'cos 2x = cos²x − sin²x; cos²x yerine 1 − sin²x yazılırsa cos 2x = 1 − 2sin²x',
     },
   ],
 }

@@ -5,6 +5,20 @@ export interface QuizQuestion {
   question: string
   options: string[]
   correctIndex: number
+  /** One-line solution hint shown after a wrong answer */
+  explanation?: string
+}
+
+/** A recall bullet in the micro-review, tagged with a Doping-style memory hint */
+export interface SummaryPoint {
+  /** Short emoji marker, e.g. 📌 */
+  icon: string
+  /** Memory tag, e.g. "Temel Özdeşlik" */
+  tag: string
+  /** The formula or fact itself */
+  text: string
+  /** Optional plain-language reminder */
+  note?: string
 }
 
 export interface Topic {
@@ -15,10 +29,12 @@ export interface Topic {
   /** 0–1 ratio of correct answers from previous reviews */
   previousSuccessRate: number
   reviewCount: number
-  /** Memory stability S in days, used in Retention = e^(-t / S) */
+  /** Memory stability S in days, used in Retention = R0 · e^(-t / S) */
   currentStrength: number
+  /** Initial recall R0 (0–1) right after the last study session; defaults to 1 */
+  initialRecall?: number
   /** Key recall points shown before the micro-review quiz */
-  summaryPoints?: string[]
+  summaryPoints?: SummaryPoint[]
   /** Mini-quiz for the micro-review flow */
   quiz?: QuizQuestion[]
   /** Set after a weak review: keeps the topic out of the safe band until reviewed again */
@@ -29,7 +45,7 @@ export interface TopicRisk {
   /** Integer retention percentage (0–100) */
   retention: number
   riskLevel: RiskLevel
-  /** True when the curve says safe but a weak last review holds it in review_soon */
+  /** True when a weak last review holds the topic in review_soon ("Takipte") */
   isFollowUp: boolean
 }
 

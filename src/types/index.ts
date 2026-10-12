@@ -21,6 +21,12 @@ export interface Topic {
   quiz?: QuizQuestion[]
 }
 
+export interface TopicRisk {
+  /** Integer retention percentage (0–100) */
+  retention: number
+  riskLevel: RiskLevel
+}
+
 export interface ReviewResult {
   /** Updated memory stability S in days */
   newStrength: number

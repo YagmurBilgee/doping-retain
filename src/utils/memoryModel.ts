@@ -1,4 +1,4 @@
-import type { ReviewResult, RiskLevel } from '../types'
+import type { ReviewResult, RiskLevel, Topic, TopicRisk } from '../types'
 
 /*
  * Rule-based MVP memory model built on the Ebbinghaus forgetting curve:
@@ -33,6 +33,12 @@ export function getRiskLevel(retentionPercentage: number): RiskLevel {
   if (retentionPercentage >= SAFE_THRESHOLD) return 'safe'
   if (retentionPercentage >= HIGH_RISK_THRESHOLD) return 'review_soon'
   return 'high_risk'
+}
+
+/** Convenience wrapper so UI components never touch the formula directly. */
+export function getTopicRisk(topic: Topic): TopicRisk {
+  const retention = calculateRetention(topic.lastStudiedDaysAgo, topic.currentStrength)
+  return { retention, riskLevel: getRiskLevel(retention) }
 }
 
 /**

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
+import DemoResetButton from '../components/DemoResetButton'
 import MemoryRiskCard from '../components/MemoryRiskCard'
 import MiniQuizModal from '../components/MiniQuizModal'
 import Sidebar from '../components/Sidebar'
@@ -36,6 +37,14 @@ function HomePage() {
     setLastReview(outcome)
     setQuizTopicId(null)
   }
+
+  // Restores the initial high-risk demo state, closing any open modal.
+  const resetDemo = useCallback(() => {
+    setTopics(mockTopics)
+    setLastReview(undefined)
+    setPendingReviewTopicId(null)
+    setQuizTopicId(null)
+  }, [])
 
   return (
     <div className="flex min-h-screen">
@@ -83,6 +92,8 @@ function HomePage() {
           onComplete={handleQuizComplete}
         />
       )}
+
+      <DemoResetButton onReset={resetDemo} />
     </div>
   )
 }

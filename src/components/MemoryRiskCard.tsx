@@ -1,7 +1,7 @@
-import { BrainCircuit, ShieldCheck, Triangle } from 'lucide-react'
+import { BrainCircuit, Clock, ShieldCheck, Triangle } from 'lucide-react'
 import type { ReviewOutcome, Topic } from '../types'
 import { getTopicRisk } from '../utils/memoryModel'
-import { RISK_PRESENTATION } from './riskPresentation'
+import { getRiskPresentation } from './riskPresentation'
 
 interface MemoryRiskCardProps {
   /** Most at-risk topic; when absent the card shows its all-clear state */
@@ -44,11 +44,14 @@ function MemoryRiskCard({
         )}
       </header>
 
-      {topic ? (
-        <AtRiskTopic topic={topic} reviewMinutes={reviewMinutes} onStartReview={onStartReview} />
-      ) : (
-        <AllClear lastReview={lastReview} />
-      )}
+      {/* Keyed by state so switching between at-risk and all-clear animates in. */}
+      <div key={topic?.id ?? 'all-clear'} className="motion-safe:animate-pop-in">
+        {topic ? (
+          <AtRiskTopic topic={topic} reviewMinutes={reviewMinutes} onStartReview={onStartReview} />
+        ) : (
+          <AllClear lastReview={lastReview} />
+        )}
+      </div>
     </section>
   )
 }
@@ -60,8 +63,9 @@ interface AtRiskTopicProps {
 }
 
 function AtRiskTopic({ topic, reviewMinutes, onStartReview }: AtRiskTopicProps) {
-  const { retention, riskLevel } = getTopicRisk(topic)
-  const styles = RISK_PRESENTATION[riskLevel]
+  const risk = getTopicRisk(topic)
+  const { retention } = risk
+  const styles = getRiskPresentation(risk)
 
   return (
     <>
@@ -93,14 +97,15 @@ function AllClear({ lastReview }: { lastReview?: ReviewOutcome }) {
   }
 
   const { updatedTopic, review } = lastReview
-  const { retention, riskLevel } = getTopicRisk(updatedTopic)
-  const styles = RISK_PRESENTATION[riskLevel]
+  const risk = getTopicRisk(updatedTopic)
+  const { retention, isFollowUp } = risk
+  const styles = getRiskPresentation(risk)
 
   return (
     <div role="status">
       <div className="list-row">
-        <span className="icon-tile bg-success text-white" aria-hidden="true">
-          <ShieldCheck size={18} />
+        <span className={`icon-tile text-white ${isFollowUp ? 'bg-risk' : 'bg-success'}`} aria-hidden="true">
+          {isFollowUp ? <Clock size={18} /> : <ShieldCheck size={18} />}
         </span>
         <div className="min-w-0 flex-1">
           <p className="section-subtitle">{updatedTopic.category}</p>
@@ -132,7 +137,10 @@ function RetentionMeter({ retention, barClass, badgeClass, label }: RetentionMet
         aria-valuemax={100}
         aria-label="Hatırlama oranı"
       >
-        <div className={`h-full rounded-full ${barClass}`} style={{ width: `${retention}%` }} />
+        <div
+          className={`h-full rounded-full ${barClass} motion-safe:animate-bar-grow`}
+          style={{ width: `${retention}%` }}
+        />
       </div>
       <span className={`badge ${badgeClass}`}>
         %{retention} Hatırlama{label ? ` · ${label}` : ' Oranı'}

@@ -51,10 +51,10 @@ function ModalShell({ isOpen, onClose, labelledBy, children }: ModalShellProps) 
       aria-labelledby={labelledBy}
       onCancel={handleCancel}
       onClick={handleBackdropClick}
-      className="m-auto w-[calc(100%-2rem)] max-w-lg bg-transparent p-0 backdrop:bg-ink/40 backdrop:backdrop-blur-xs"
+      className="m-auto w-[calc(100%-2rem)] max-w-lg bg-transparent p-0 backdrop:bg-ink/40 backdrop:backdrop-blur-xs motion-safe:backdrop:animate-fade-in"
     >
       {isOpen && (
-        <div className="card relative p-card shadow-float">
+        <div className="card relative p-card shadow-float motion-safe:animate-modal-in">
           <button
             type="button"
             aria-label="Kapat"

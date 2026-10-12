@@ -21,12 +21,16 @@ export interface Topic {
   summaryPoints?: string[]
   /** Mini-quiz for the micro-review flow */
   quiz?: QuizQuestion[]
+  /** Set after a weak review: keeps the topic out of the safe band until reviewed again */
+  needsFollowUp?: boolean
 }
 
 export interface TopicRisk {
   /** Integer retention percentage (0–100) */
   retention: number
   riskLevel: RiskLevel
+  /** True when the curve says safe but a weak last review holds it in review_soon */
+  isFollowUp: boolean
 }
 
 /** Score band of a micro-review: 3/3, at least 2/3, or below */
@@ -45,4 +49,6 @@ export interface ReviewOutcome {
   review: ReviewResult
   /** Predicted retention on the day of the next scheduled review */
   retentionAtNextReview: number
+  /** Retention points gained by the review (after minus before) */
+  retentionGain: number
 }

@@ -1,7 +1,7 @@
-import { ArrowRight, CalendarCheck, PartyPopper, Sparkles, TrendingUp } from 'lucide-react'
+import { ArrowRight, CalendarCheck, Clock, PartyPopper, TrendingUp, type LucideIcon } from 'lucide-react'
 import type { ReviewOutcome, ReviewTier, Topic } from '../types'
 import { getTopicRisk } from '../utils/memoryModel'
-import { RISK_PRESENTATION } from './riskPresentation'
+import { getRiskPresentation, type RiskPresentation } from './riskPresentation'
 
 interface QuizResultViewProps {
   /** Topic as it was before the review */
@@ -12,23 +12,26 @@ interface QuizResultViewProps {
   onFinish: () => void
 }
 
-const TIER_COPY: Record<ReviewTier, { badge: string; tile: string; headline: string; message: string }> = {
+const TIER_COPY: Record<ReviewTier, { icon: LucideIcon; badge: string; tile: string; headline: string; message: string }> = {
   perfect: {
+    icon: PartyPopper,
     badge: 'badge-success',
     tile: 'bg-success-soft text-success',
     headline: 'Tebrikler! Konuyu Hafızana Sabitledin',
     message: 'Tüm soruları doğru yanıtladın. Bellek gücün iki katına çıktı.',
   },
   partial: {
+    icon: TrendingUp,
     badge: 'badge-brand',
     tile: 'bg-brand-soft text-brand',
     headline: 'Harika İlerleme! Konu Güçlendi',
     message: 'Küçük bir eksik kaldı. Bir hafta sonra kısa bir tekrarla tamamlayacağız.',
   },
   weak: {
+    icon: Clock,
     badge: 'badge-risk',
     tile: 'bg-risk-soft text-risk-ink',
-    headline: 'İyi Başlangıç! Yakında Tekrar Edelim',
+    headline: 'İyi Başlangıç! Konuyu Takibe Aldık',
     message: 'Bu konu biraz daha ilgi istiyor. İki gün sonra yeniden hatırlatacağız.',
   },
 }
@@ -36,16 +39,15 @@ const TIER_COPY: Record<ReviewTier, { badge: string; tile: string; headline: str
 function QuizResultView({ topic, score, total, outcome, onFinish }: QuizResultViewProps) {
   const before = getTopicRisk(topic)
   const after = getTopicRisk(outcome.updatedTopic)
-  const beforeRisk = RISK_PRESENTATION[before.riskLevel]
-  const afterRisk = RISK_PRESENTATION[after.riskLevel]
-  const { review, retentionAtNextReview } = outcome
+  const { review, retentionAtNextReview, retentionGain } = outcome
   const copy = TIER_COPY[review.tier]
+  const TierIcon = copy.icon
 
   return (
     <>
       <header className="flex flex-col items-center text-center">
-        <span className={`icon-tile size-14 ${copy.tile}`} aria-hidden="true">
-          <PartyPopper size={28} />
+        <span className={`icon-tile size-14 ${copy.tile} motion-safe:animate-pop-in`} aria-hidden="true">
+          <TierIcon size={28} />
         </span>
         <span className={`badge ${copy.badge} mt-3`}>
           {score} / {total} doğru
@@ -56,46 +58,38 @@ function QuizResultView({ topic, score, total, outcome, onFinish }: QuizResultVi
         <p className="mt-1 text-sm text-ink-secondary">{copy.message}</p>
       </header>
 
-      <section className="mt-5 grid grid-cols-[1fr_auto_1fr] items-stretch gap-2" aria-label="Hafıza durumu karşılaştırması">
-        <div className="rounded-tile bg-surface-muted p-card-sm">
-          <p className="section-subtitle">Eski Durum</p>
-          <p className="mt-1 text-2xl font-extrabold text-ink">%{before.retention}</p>
-          <p className="text-xs text-ink-muted">Hatırlama Oranı</p>
-          <span className={`badge ${beforeRisk.badge} mt-2`}>{beforeRisk.label}</span>
-          <p className="mt-2 text-xs text-ink-secondary">Bellek gücü: {topic.currentStrength.toLocaleString('tr-TR')} gün</p>
+      <section
+        className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-card bg-surface-muted p-card-sm"
+        aria-label={`Hatırlama oranı %${before.retention} değerinden %${after.retention} değerine çıktı`}
+      >
+        <RetentionRing
+          caption="Önce"
+          retention={before.retention}
+          presentation={getRiskPresentation(before)}
+          strengthDays={topic.currentStrength}
+        />
+
+        <div className="flex flex-col items-center gap-1.5" aria-hidden="true">
+          <ArrowRight size={18} className="text-ink-muted" />
+          <span className="badge badge-success motion-safe:animate-pop-in">+{retentionGain} puan</span>
         </div>
 
-        <span className="flex items-center text-ink-muted" aria-hidden="true">
-          <ArrowRight size={18} />
-        </span>
-
-        <div className="rounded-tile border border-success bg-success-soft p-card-sm">
-          <p className="section-subtitle flex items-center gap-1 text-success-ink">
-            <Sparkles size={12} aria-hidden="true" />
-            Yeni Durum
-          </p>
-          <p className="mt-1 text-2xl font-extrabold text-ink">%{after.retention}</p>
-          <p className="text-xs text-ink-muted">Hatırlama Oranı</p>
-          <span className={`badge ${afterRisk.badge} mt-2`}>{afterRisk.label}</span>
-          <p className="mt-2 flex items-center gap-1 text-xs font-semibold text-success-ink">
-            <TrendingUp size={12} aria-hidden="true" />
-            Bellek gücü: {review.newStrength.toLocaleString('tr-TR')} gün
-          </p>
-        </div>
+        <RetentionRing
+          caption="Sonra"
+          retention={after.retention}
+          presentation={getRiskPresentation(after)}
+          strengthDays={review.newStrength}
+          isStrengthened
+        />
       </section>
 
-      <div className="list-row mt-3">
+      <div className="mt-3 flex items-center gap-3 rounded-tile border border-brand/20 bg-brand-soft p-card-sm">
         <span className="icon-tile bg-brand text-white" aria-hidden="true">
           <CalendarCheck size={18} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="section-subtitle">Yeni Tekrar Planı</p>
-          <p className="text-sm font-semibold text-ink">
-            Sonraki tekrar {review.nextReviewInDays} gün sonra planlandı
-          </p>
-          <p className="text-xs text-ink-muted">
-            O gün tahmini hatırlama oranın %{retentionAtNextReview} olacak.
-          </p>
+          <p className="text-base font-bold text-brand">Sonraki Tekrar: {review.nextReviewInDays} gün sonra</p>
+          <p className="text-xs text-ink-secondary">O gün tahmini hatırlama oranın %{retentionAtNextReview} olacak.</p>
         </div>
       </div>
 
@@ -103,6 +97,52 @@ function QuizResultView({ topic, score, total, outcome, onFinish }: QuizResultVi
         Ana Sayfaya Dön
       </button>
     </>
+  )
+}
+
+interface RetentionRingProps {
+  caption: string
+  retention: number
+  presentation: RiskPresentation
+  strengthDays: number
+  isStrengthened?: boolean
+}
+
+function RetentionRing({ caption, retention, presentation, strengthDays, isStrengthened = false }: RetentionRingProps) {
+  return (
+    <div className="flex flex-col items-center text-center">
+      <p className="section-subtitle">{caption}</p>
+      <div className="relative mt-2 size-24">
+        <svg viewBox="0 0 100 100" className="size-full -rotate-90" aria-hidden="true">
+          <circle cx="50" cy="50" r="42" fill="none" strokeWidth="9" className="stroke-line" />
+          <circle
+            cx="50"
+            cy="50"
+            r="42"
+            fill="none"
+            strokeWidth="9"
+            strokeLinecap="round"
+            stroke="currentColor"
+            pathLength={100}
+            strokeDasharray="100"
+            strokeDashoffset={100 - retention}
+            className={`${presentation.text} motion-safe:animate-ring-fill`}
+          />
+        </svg>
+        <span className="absolute inset-0 flex items-center justify-center text-2xl font-extrabold text-ink">
+          %{retention}
+        </span>
+      </div>
+      <span className={`badge ${presentation.badge} mt-2`}>{presentation.label}</span>
+      <p
+        className={`mt-1.5 flex items-center gap-1 text-xs ${
+          isStrengthened ? 'font-semibold text-success-ink' : 'text-ink-secondary'
+        }`}
+      >
+        {isStrengthened && <TrendingUp size={12} aria-hidden="true" />}
+        Bellek gücü: {strengthDays.toLocaleString('tr-TR')} gün
+      </p>
+    </div>
   )
 }
 

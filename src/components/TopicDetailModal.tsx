@@ -2,7 +2,7 @@ import { Lightbulb } from 'lucide-react'
 import type { Topic } from '../types'
 import { getTopicRisk } from '../utils/memoryModel'
 import ModalShell from './ModalShell'
-import { RISK_PRESENTATION } from './riskPresentation'
+import { getRiskPresentation } from './riskPresentation'
 
 interface TopicDetailModalProps {
   isOpen: boolean
@@ -50,8 +50,9 @@ function TopicDetailContent({
   onClose,
   onStartQuiz,
 }: TopicDetailContentProps) {
-  const { retention, riskLevel } = getTopicRisk(topic)
-  const risk = RISK_PRESENTATION[riskLevel]
+  const topicRisk = getTopicRisk(topic)
+  const { retention } = topicRisk
+  const risk = getRiskPresentation(topicRisk)
 
   return (
     <>

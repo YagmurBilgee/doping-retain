@@ -63,28 +63,31 @@ function MiniQuizModal({ topic, onClose, onComplete }: MiniQuizModalProps) {
 
   return (
     <ModalShell isOpen onClose={handleDismiss} labelledBy="mini-quiz-title">
-      {state.phase === 'answering' ? (
-        <QuestionStep
-          topic={topic}
-          index={state.index}
-          selected={state.selected}
-          total={total}
-          onSelect={(option) =>
-            dispatch({ type: 'select', option, correctIndex: questions[state.index].correctIndex })
-          }
-          onNext={() => dispatch({ type: 'next', total })}
-        />
-      ) : (
-        outcome && (
-          <QuizResultView
+      {/* Keyed per step so each question and the result fade in on change. */}
+      <div key={state.phase === 'answering' ? `question-${state.index}` : 'result'} className="motion-safe:animate-fade-in">
+        {state.phase === 'answering' ? (
+          <QuestionStep
             topic={topic}
-            score={state.score}
+            index={state.index}
+            selected={state.selected}
             total={total}
-            outcome={outcome}
-            onFinish={() => onComplete(outcome)}
+            onSelect={(option) =>
+              dispatch({ type: 'select', option, correctIndex: questions[state.index].correctIndex })
+            }
+            onNext={() => dispatch({ type: 'next', total })}
           />
-        )
-      )}
+        ) : (
+          outcome && (
+            <QuizResultView
+              topic={topic}
+              score={state.score}
+              total={total}
+              outcome={outcome}
+              onFinish={() => onComplete(outcome)}
+            />
+          )
+        )}
+      </div>
     </ModalShell>
   )
 }

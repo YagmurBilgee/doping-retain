@@ -35,10 +35,17 @@ export function getRiskLevel(retentionPercentage: number): RiskLevel {
   return 'high_risk'
 }
 
-/** Convenience wrapper so UI components never touch the formula directly. */
+/**
+ * Convenience wrapper so UI components never touch the formula directly.
+ * A topic flagged for follow-up (weak last review) is never reported as safe:
+ * it stays in review_soon until a stronger review clears the flag.
+ */
 export function getTopicRisk(topic: Topic): TopicRisk {
   const retention = calculateRetention(topic.lastStudiedDaysAgo, topic.currentStrength)
-  return { retention, riskLevel: getRiskLevel(retention) }
+  const curveLevel = getRiskLevel(retention)
+  const isFollowUp = topic.needsFollowUp === true && curveLevel === 'safe'
+
+  return { retention, riskLevel: isFollowUp ? 'review_soon' : curveLevel, isFollowUp }
 }
 
 /**
@@ -64,8 +71,8 @@ export function calculateNextReview(
 
 /**
  * Applies a finished micro-review to a topic: stability grows per the review
- * rules, the topic counts as studied today (t = 0) and the success rate becomes
- * a running average across reviews.
+ * rules, the topic counts as studied today (t = 0), the success rate becomes
+ * a running average across reviews, and a weak score flags it for follow-up.
  */
 export function applyReviewResult(topic: Topic, quizScore: number, totalQuestions: number): ReviewOutcome {
   const review = calculateNextReview(quizScore, totalQuestions, topic.currentStrength)
@@ -81,9 +88,11 @@ export function applyReviewResult(topic: Topic, quizScore: number, totalQuestion
       lastStudiedDaysAgo: 0,
       reviewCount,
       previousSuccessRate,
+      needsFollowUp: review.tier === 'weak',
     },
     review,
     retentionAtNextReview: calculateRetention(review.nextReviewInDays, review.newStrength),
+    retentionGain: calculateRetention(0, review.newStrength) - calculateRetention(topic.lastStudiedDaysAgo, topic.currentStrength),
   }
 }
 

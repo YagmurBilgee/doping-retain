@@ -23,8 +23,4 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update="Fixtures\memory-model-parity.json" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-
 </Project>

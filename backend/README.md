@@ -1,7 +1,7 @@
 # Doping Retain API
 
 Local ASP.NET Core API for the Doping Retain demo (.NET 8, pinned in `global.json`).
-Stores one demo student and the four demo topics in SQLite.
+Stores one demo student, the demo topics and their test results in SQLite.
 
 ## Setup and run
 
@@ -21,7 +21,7 @@ dotnet run --project DopingRetain.Api --urls http://localhost:5081
 ## Frontend
 
 In development the Vite server (`npm run dev` in the repository root) proxies `/api` to
-`http://localhost:5080`, so run the API alongside it. The homepage risk card, the topic detail
+`http://localhost:5080`, so run the API alongside it. The homepage review card, the topic detail
 modal, the mini quiz (review sessions, answers, completion) and the dev-only "Demoyu Sıfırla" button
 (Alt+Shift+R) all use the API; the app bundle contains no answer keys or local scoring.
 

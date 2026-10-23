@@ -1,22 +1,23 @@
-import { BrainCircuit, CalendarCheck, Clock, RotateCcw, ShieldCheck, Triangle } from 'lucide-react'
-import { daysSinceStudied, type LoadState, type ReviewCompletion, type TopicsResponse, type TopicSummary } from '../api/types'
-import { getRiskPresentation } from './riskPresentation'
+import { BrainCircuit, CalendarCheck, RotateCcw, ShieldCheck } from 'lucide-react'
+import type { LoadState, TopicsResponse, TopicSummary } from '../api/types'
+import LatestTestSummary from './LatestTestSummary'
+import { formatDate, getStatusPresentation } from './reviewPresentation'
 
 interface MemoryRiskCardProps {
   /** Backend evaluation of the student's topics */
   topics: LoadState<TopicsResponse>
   onRetry: () => void
-  /** Latest review stored by the server, shown as feedback when no topic is at high risk */
-  lastReview?: ReviewCompletion
-  /** Estimated micro-review duration shown on the CTA */
+  /** Estimated micro-review duration shown on each due topic's button */
   reviewMinutes?: number
   onStartReview?: (topicId: string) => void
 }
 
-function MemoryRiskCard({ topics, onRetry, lastReview, reviewMinutes = 5, onStartReview }: MemoryRiskCardProps) {
+function MemoryRiskCard({ topics, onRetry, reviewMinutes = 5, onStartReview }: MemoryRiskCardProps) {
   const data = topics.status === 'ready' ? topics.data : undefined
-  const topic = data?.topics.find(({ id }) => id === data.highestRiskTopicId)
-  const reinforcementTopics = data?.topics.filter((summary) => summary.needsInitialReinforcement) ?? []
+  // Backend priority order; the heading counts exactly what is listed.
+  const dueTopics = data?.dueTopicIds.flatMap((id) => data.topics.filter((topic) => topic.id === id)) ?? []
+  const supportTopics = data?.topics.filter(({ reviewStatus }) => reviewStatus === 'support_needed') ?? []
+  const noDataTopics = data?.topics.filter(({ reviewStatus }) => reviewStatus === 'insufficient_data') ?? []
 
   return (
     <section className="card" aria-labelledby="memory-risk-title" aria-busy={topics.status === 'loading'}>
@@ -26,11 +27,15 @@ function MemoryRiskCard({ topics, onRetry, lastReview, reviewMinutes = 5, onStar
             Dopingle Hatırla
           </h2>
           <p className="section-subtitle mt-0.5">
-            {data ? `${data.highRiskCount} konu yüksek risk altında` : 'Hafıza durumun'}
+            {!data
+              ? 'Tekrar planın'
+              : dueTopics.length > 0
+                ? `${dueTopics.length} konunun tekrar zamanı geldi`
+                : 'Şu an tekrar zamanı gelen konu yok'}
           </p>
         </div>
-        {topic || !data ? (
-          <span className="icon-tile size-9 bg-danger-soft text-danger" aria-hidden="true">
+        {dueTopics.length > 0 || !data ? (
+          <span className="icon-tile size-9 bg-risk-soft text-risk-ink" aria-hidden="true">
             <BrainCircuit size={18} />
           </span>
         ) : (
@@ -52,23 +57,20 @@ function MemoryRiskCard({ topics, onRetry, lastReview, reviewMinutes = 5, onStar
         </div>
       )}
 
-      {data && (
-        // Keyed by state so switching between at-risk and all-clear animates in.
-        <div key={topic?.id ?? 'all-clear'} className="motion-safe:animate-pop-in">
-          {topic ? (
-            <AtRiskTopic
-              topic={topic}
-              daysAgo={daysSinceStudied(topic, data.evaluatedAt)}
-              reviewMinutes={reviewMinutes}
-              onStartReview={onStartReview}
-            />
-          ) : (
-            <AllClear lastReview={lastReview} hasReinforcementTopics={reinforcementTopics.length > 0} />
-          )}
-        </div>
+      {data &&
+        (dueTopics.length > 0 ? (
+          <DueTopics topics={dueTopics} evaluatedAt={data.evaluatedAt} reviewMinutes={reviewMinutes} onStartReview={onStartReview} />
+        ) : (
+          <NothingDue data={data} />
+        ))}
+
+      {data && supportTopics.length > 0 && (
+        <TopicList id="support-topics-title" title="Pekiştirme Önerilen Konular" topics={supportTopics} evaluatedAt={data.evaluatedAt} onOpenTopic={onStartReview} />
       )}
 
-      {reinforcementTopics.length > 0 && <ReinforcementTopics topics={reinforcementTopics} onOpenTopic={onStartReview} />}
+      {data && noDataTopics.length > 0 && (
+        <TopicList id="no-data-topics-title" title="Test Sonucu Bekleyen Konular" topics={noDataTopics} evaluatedAt={data.evaluatedAt} onOpenTopic={onStartReview} />
+      )}
 
       {/* Only from a loaded response, so loading or errors never show a made-up zero. */}
       {data && <WeeklyReviews count={data.weeklyReviewedTopicCount} />}
@@ -86,29 +88,77 @@ function WeeklyReviews({ count }: { count: number }) {
   )
 }
 
-interface ReinforcementTopicsProps {
+interface DueTopicsProps {
   topics: TopicSummary[]
+  evaluatedAt: string
+  reviewMinutes: number
+  onStartReview?: (topicId: string) => void
+}
+
+/** Every due topic in priority order; the card heading already says they are due, so rows carry no status label. */
+function DueTopics({ topics, evaluatedAt, reviewMinutes, onStartReview }: DueTopicsProps) {
+  return (
+    <ul className="flex flex-col gap-2">
+      {topics.map((topic) => (
+        <li key={topic.id} className="list-row block">
+          {/* The action shares the title row, so the test summary below gets the full width. */}
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="section-subtitle">{topic.category}</p>
+              <p className="truncate text-sm font-semibold text-ink">{topic.title}</p>
+            </div>
+            <button
+              type="button"
+              className="btn-primary shrink-0 px-3 py-1.5 text-xs"
+              aria-label={`${topic.title} konusunu tekrar et (${reviewMinutes} dakika)`}
+              onClick={() => onStartReview?.(topic.id)}
+            >
+              Tekrar Et ({reviewMinutes} dk)
+            </button>
+          </div>
+          <div className="mt-1">
+            <LatestTestSummary test={topic.latestTest} evaluatedAt={evaluatedAt} />
+          </div>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+interface TopicListProps {
+  id: string
+  title: string
+  topics: TopicSummary[]
+  evaluatedAt: string
   onOpenTopic?: (topicId: string) => void
 }
 
-/** Low initial mastery is not forgetting: listed below the forgetting topic, never counted as high risk. */
-function ReinforcementTopics({ topics, onOpenTopic }: ReinforcementTopicsProps) {
+/** Topics listed below the due topics; they are never counted as due. */
+function TopicList({ id, title, topics, evaluatedAt, onOpenTopic }: TopicListProps) {
   return (
-    <section className="mt-5 border-t border-line pt-4" aria-labelledby="reinforcement-topics-title">
-      <h3 id="reinforcement-topics-title" className="text-sm font-semibold text-ink">
-        Pekiştirme Bekleyen Konular
+    <section className="mt-5 border-t border-line pt-4" aria-labelledby={id}>
+      <h3 id={id} className="text-sm font-semibold text-ink">
+        {title}
       </h3>
       <ul className="mt-2 flex flex-col gap-2">
-        {topics.map((reinforcementTopic) => {
-          const styles = getRiskPresentation(reinforcementTopic)
+        {topics.map((listed) => {
+          const status = getStatusPresentation(listed.reviewStatus)
           return (
-            <li key={reinforcementTopic.id}>
-              <button type="button" className="list-row w-full text-left" onClick={() => onOpenTopic?.(reinforcementTopic.id)}>
-                <span className="min-w-0 flex-1">
-                  <span className="section-subtitle block">{reinforcementTopic.category}</span>
-                  <span className="block truncate text-sm font-semibold text-ink">{reinforcementTopic.title}</span>
+            <li key={listed.id}>
+              <button type="button" className="list-row block w-full text-left" onClick={() => onOpenTopic?.(listed.id)}>
+                <span className="flex items-start gap-2">
+                  <span className="min-w-0 flex-1">
+                    <span className="section-subtitle block">{listed.category}</span>
+                    <span className="block truncate text-sm font-semibold text-ink">{listed.title}</span>
+                  </span>
+                  <span className={`badge ${status.badge} shrink-0`}>{status.label}</span>
                 </span>
-                <span className={`badge ${styles.badge}`}>{styles.label}</span>
+                {/* Without a test the status badge already says so. */}
+                {listed.latestTest && (
+                  <span className="mt-1 block">
+                    <LatestTestSummary test={listed.latestTest} evaluatedAt={evaluatedAt} />
+                  </span>
+                )}
               </button>
             </li>
           )
@@ -118,109 +168,17 @@ function ReinforcementTopics({ topics, onOpenTopic }: ReinforcementTopicsProps) 
   )
 }
 
-interface AtRiskTopicProps {
-  topic: TopicSummary
-  daysAgo: number
-  reviewMinutes: number
-  onStartReview?: (topicId: string) => void
-}
-
-function AtRiskTopic({ topic, daysAgo, reviewMinutes, onStartReview }: AtRiskTopicProps) {
-  const styles = getRiskPresentation(topic)
+/** Nothing is due (the heading says so): name the next scheduled review, if any. */
+function NothingDue({ data }: { data: TopicsResponse }) {
+  const next = data.topics
+    .filter(({ reviewStatus, nextReviewAt }) => reviewStatus === 'scheduled' && nextReviewAt)
+    .sort((a, b) => Date.parse(a.nextReviewAt!) - Date.parse(b.nextReviewAt!))[0]
+  if (!next) return null
 
   return (
-    <>
-      <div className="list-row">
-        <span className="icon-tile bg-brand text-white" aria-hidden="true">
-          <Triangle size={18} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="section-subtitle">{topic.category}</p>
-          <p className="truncate text-sm font-semibold text-ink">{topic.title}</p>
-          <p className="text-xs text-ink-muted">{daysAgo} gün önce çalışıldı</p>
-        </div>
-      </div>
-
-      <RetentionMeter retention={topic.retention} barClass={styles.bar} badgeClass={styles.badge} />
-
-      <button type="button" className="btn-primary mt-4 w-full" onClick={() => onStartReview?.(topic.id)}>
-        Hemen Tekrar Et ({reviewMinutes} dk)
-      </button>
-    </>
-  )
-}
-
-interface AllClearProps {
-  lastReview?: ReviewCompletion
-  /** Topics needing initial reinforcement are not forgetting, so they never make this state "all good" */
-  hasReinforcementTopics: boolean
-}
-
-/** A high-risk topic always takes precedence; this feedback only fills the all-clear state. */
-function AllClear({ lastReview, hasReinforcementTopics }: AllClearProps) {
-  if (!lastReview) {
-    return (
-      <p className="text-sm text-ink-secondary">
-        {hasReinforcementTopics
-          ? 'Şu an unutmak üzere olduğun bir konu yok. Pekiştirme bekleyen konuların var.'
-          : 'Şu an unutmak üzere olduğun bir konu yok. Harika gidiyorsun!'}
-      </p>
-    )
-  }
-
-  const { updatedTopic, review, riskAfter } = lastReview
-  const styles = getRiskPresentation(riskAfter)
-
-  return (
-    <div role="status">
-      <div className="list-row">
-        <span className={`icon-tile text-white ${riskAfter.isFollowUp ? 'bg-risk' : 'bg-success'}`} aria-hidden="true">
-          {riskAfter.isFollowUp ? <Clock size={18} /> : <ShieldCheck size={18} />}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="section-subtitle">{updatedTopic.category}</p>
-          <p className="truncate text-sm font-semibold text-ink">{updatedTopic.title} tekrar edildi</p>
-          <p className="text-xs text-ink-muted">Sonraki tekrar {review.nextReviewInDays} gün sonra</p>
-        </div>
-      </div>
-
-      <RetentionMeter
-        retention={riskAfter.retention}
-        barClass={styles.bar}
-        badgeClass={styles.badge}
-        label={styles.label}
-      />
-    </div>
-  )
-}
-
-interface RetentionMeterProps {
-  retention: number
-  barClass: string
-  badgeClass: string
-  label?: string
-}
-
-function RetentionMeter({ retention, barClass, badgeClass, label }: RetentionMeterProps) {
-  return (
-    <div className="mt-4 flex items-center gap-3">
-      <div
-        className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-muted"
-        role="progressbar"
-        aria-valuenow={retention}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label="Hatırlama oranı"
-      >
-        <div
-          className={`h-full rounded-full ${barClass} motion-safe:animate-bar-grow`}
-          style={{ width: `${retention}%` }}
-        />
-      </div>
-      <span className={`badge ${badgeClass}`}>
-        %{retention} Hatırlama{label ? ` · ${label}` : ' Oranı'}
-      </span>
-    </div>
+    <p className="text-sm text-ink-secondary">
+      Sıradaki tekrar: <span className="font-semibold text-ink">{next.title}</span> · {formatDate(next.nextReviewAt!, data.evaluatedAt)}
+    </p>
   )
 }
 

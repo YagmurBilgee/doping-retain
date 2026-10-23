@@ -1,8 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { ArrowRight, CalendarCheck, Clock, PartyPopper, PlayCircle, TrendingUp, type LucideIcon } from 'lucide-react'
+import { CalendarCheck, PlayCircle } from 'lucide-react'
 import type { ReviewCompletion } from '../api/types'
-import type { ReviewTier, RiskLevel } from '../types'
-import { getRiskPresentation, type RiskPresentation } from './riskPresentation'
+import { formatScore, getStatusPresentation, scheduleText, testTypeLabel } from './reviewPresentation'
 
 interface QuizResultViewProps {
   /** Outcome stored by the server; nothing here is recalculated */
@@ -10,122 +9,75 @@ interface QuizResultViewProps {
   onFinish: () => void
 }
 
-interface TierCopy {
-  icon: LucideIcon
+interface ScoreCopy {
   badge: string
-  tile: string
-  /** Built from the server's question count */
-  headline: (total: number) => string
-  /** Built from the server's review interval, never from a hardcoded day count */
-  message: (nextReviewInDays: number) => string
+  message: (total: number) => string
 }
 
-const TIER_COPY: Record<ReviewTier, TierCopy> = {
-  perfect: {
-    icon: PartyPopper,
+/** Simple score-based feedback; it describes this result only and promises nothing about memory. */
+const SCORE_COPY: Record<'full' | 'partial' | 'zero', ScoreCopy> = {
+  full: {
     badge: 'badge-success',
-    tile: 'bg-success-soft text-success',
-    headline: (total) => `Harika! ${total} sorunun tamamı doğru`,
-    message: () => 'Kısa tekrarı tamamladın. Bir sonraki tekrarın planlandı.',
+    message: (total) => `Harika! ${total} sorunun tamamını doğru yanıtladın.`,
   },
   partial: {
-    icon: TrendingUp,
     badge: 'badge-brand',
-    tile: 'bg-brand-soft text-brand',
-    headline: () => 'Harika İlerleme! Konu Güçlendi',
-    message: (days) => `Küçük bir eksik kaldı. ${days} gün sonra kısa bir tekrarla tamamlayacağız.`,
+    message: () => 'Kaçırdığın noktaları hızlı hatırlatmadan bir kez daha gözden geçirerek pekiştirebilirsin.',
   },
-  weak: {
-    icon: Clock,
+  zero: {
     badge: 'badge-risk',
-    tile: 'bg-risk-soft text-risk-ink',
-    headline: () => 'İyi Başlangıç! Konuyu Takibe Aldık',
-    message: (days) => `Bu konu biraz daha ilgi istiyor. ${days} gün sonra yeniden hatırlatacağız.`,
+    message: () => 'Bu konuyu temelden yeniden gözden geçirmek iyi olabilir.',
   },
-}
-
-const FIRST_REINFORCEMENT_PERFECT: TierCopy = {
-  ...TIER_COPY.perfect,
-  headline: () => 'Güzel! Konu Güçlendi',
-  message: () => 'Tüm soruları doğru yanıtladın. Konuyu sonraki tekrarlarla pekiştirmeye devam edeceğiz.',
-}
-
-interface PersistenceLabel {
-  text: string
-  tone: string
-  icon?: LucideIcon
-}
-
-/** Student-friendly persistence wording instead of raw stability days. */
-const PERSISTENCE_BEFORE: Record<RiskLevel, PersistenceLabel> = {
-  high_risk: { text: 'Kalıcılık: Düşük', tone: 'text-ink-secondary' },
-  review_soon: { text: 'Kalıcılık: Orta', tone: 'text-ink-secondary' },
-  safe: { text: 'Kalıcılık: Yüksek', tone: 'text-ink-secondary' },
-}
-
-const PERSISTENCE_AFTER: Record<ReviewTier, PersistenceLabel> = {
-  perfect: { text: 'Kalıcılık: Güçlendirildi', tone: 'font-semibold text-success-ink', icon: TrendingUp },
-  partial: { text: 'Kalıcılık: Güçlendirildi', tone: 'font-semibold text-success-ink', icon: TrendingUp },
-  weak: { text: 'Kalıcılık: Takip Ediliyor', tone: 'font-semibold text-risk-ink', icon: Clock },
 }
 
 function QuizResultView({ outcome, onFinish }: QuizResultViewProps) {
-  const { score, total, review, retentionAtNextReview, retentionGain, riskBefore: before, riskAfter: after } = outcome
-  const afterPresentation = getRiskPresentation(after)
-  // A first review of a topic that needed initial reinforcement never claims the topic is mastered.
-  const copy = before.needsInitialReinforcement && review.tier === 'perfect' ? FIRST_REINFORCEMENT_PERFECT : TIER_COPY[review.tier]
-  const TierIcon = copy.icon
+  const { score, total, testResult } = outcome
   const isPerfect = total > 0 && score === total
-  // Only a confirmed 0 score: 1/3 shares the weak tier but should not be sent back to the lesson.
+  // Only a confirmed 0 score is sent back to the lesson video.
   const recommendLessonVideo = score === 0
+  const copy = SCORE_COPY[isPerfect ? 'full' : recommendLessonVideo ? 'zero' : 'partial']
+  const status = getStatusPresentation(outcome.reviewStatus)
+  const schedule = scheduleText(outcome.reviewStatus, outcome.nextReviewAt, outcome.completedAt)
 
   return (
     <>
       <header className="relative flex flex-col items-center text-center">
         {isPerfect && <ConfettiBurst sessionId={outcome.sessionId} />}
-        <span className={`icon-tile relative z-10 size-14 ${copy.tile} motion-safe:animate-pop-in`} aria-hidden="true">
-          <TierIcon size={28} />
-        </span>
-        <span className={`badge ${copy.badge} mt-3`}>
+        {/*
+         * Decorative (public/images/mascot-happy.png, 1254×1254, transparent): shown for every completed
+         * quiz to mark the effort, not mastery. Negative margins absorb the empty transparent edges.
+         */}
+        <img
+          src="/images/mascot-happy.png"
+          alt=""
+          width={1254}
+          height={1254}
+          className="relative z-10 -mt-2 -mb-1 size-[88px] object-contain sm:size-[120px]"
+        />
+        <span className={`badge ${copy.badge} mt-2`}>
           {score} / {total} doğru
         </span>
         <h2 id="mini-quiz-title" className="mt-2 text-xl font-bold tracking-tight text-ink">
-          {copy.headline(total)}
+          Tekrar tamamlandı
         </h2>
-        <p className="mt-1 text-sm text-ink-secondary">{copy.message(review.nextReviewInDays)}</p>
+        <p className="mt-1 text-sm text-ink-secondary">{copy.message(total)}</p>
       </header>
 
-      <section
-        className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-card bg-surface-muted p-card-sm"
-        aria-label={`Hatırlama oranı %${before.retention} değerinden %${after.retention} değerine çıktı`}
-      >
-        <RetentionRing
-          caption="Önce"
-          retention={before.retention}
-          presentation={getRiskPresentation(before)}
-          persistence={PERSISTENCE_BEFORE[before.riskLevel]}
-        />
-
-        <div className="flex flex-col items-center gap-1.5" aria-hidden="true">
-          <ArrowRight size={18} className="text-ink-muted" />
-          <span className={`badge ${afterPresentation.badge} motion-safe:animate-pop-in`}>+{retentionGain} puan</span>
+      <div className="mt-5 grid gap-2 sm:grid-cols-2">
+        <div className="rounded-tile bg-surface-muted p-card-sm">
+          <p className="section-subtitle">Test sonucun</p>
+          <p className="mt-1 text-base font-bold text-ink">{formatScore(testResult)}</p>
+          <p className="text-xs text-ink-secondary">{testTypeLabel(testResult.testType)}</p>
         </div>
-
-        <RetentionRing
-          caption="Sonra"
-          retention={after.retention}
-          presentation={afterPresentation}
-          persistence={PERSISTENCE_AFTER[review.tier]}
-        />
-      </section>
-
-      <div className="mt-3 flex items-center gap-3 rounded-tile border border-brand/20 bg-brand-soft p-card-sm">
-        <span className="icon-tile bg-brand text-white" aria-hidden="true">
-          <CalendarCheck size={18} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-base font-bold text-brand">Sonraki Tekrar: {review.nextReviewInDays} gün sonra</p>
-          <p className="text-xs text-ink-secondary">O gün tahmini hatırlama oranın %{retentionAtNextReview} olacak.</p>
+        <div className="flex gap-3 rounded-tile border border-brand/20 bg-brand-soft p-card-sm">
+          <span className="icon-tile size-9 bg-brand text-white" aria-hidden="true">
+            <CalendarCheck size={18} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="section-subtitle">Öneri</p>
+            <span className={`badge ${status.badge} mt-1`}>{status.label}</span>
+            {schedule && <p className="mt-1 text-sm font-semibold text-brand">{schedule}</p>}
+          </div>
         </div>
       </div>
 
@@ -148,7 +100,7 @@ const celebratedSessions = new Set<string>()
 const CONFETTI_MS = 1500
 
 /*
- * Fixed decorative pieces. Offsets (px) keep them beside the result icon, within its height band,
+ * Fixed decorative pieces. Offsets (px) keep them beside the mascot, within its height band,
  * so they never cross the score badge, the headline or any control.
  */
 const CONFETTI_PIECES = [
@@ -167,7 +119,7 @@ const CONFETTI_PIECES = [
 ]
 
 /**
- * A short, silent burst behind the result icon, at most once per session while the app runs:
+ * A short, silent burst behind the mascot, at most once per session while the app runs:
  * completion retries and later mounts of the same result skip it. Off for reduced motion.
  */
 function ConfettiBurst({ sessionId }: { sessionId: string }) {
@@ -186,7 +138,7 @@ function ConfettiBurst({ sessionId }: { sessionId: string }) {
   if (!isVisible) return null
 
   return (
-    <div aria-hidden="true" data-confetti className="pointer-events-none absolute top-7 left-1/2 size-0 motion-reduce:hidden">
+    <div aria-hidden="true" data-confetti className="pointer-events-none absolute top-11 left-1/2 size-0 motion-reduce:hidden sm:top-13">
       {CONFETTI_PIECES.map(({ x, y, r, color, delay }) => (
         <span
           key={`${x}:${y}`}
@@ -236,49 +188,6 @@ function LessonVideoRecommendation({ topicTitle }: { topicTitle: string }) {
         {showPrototypeNotice && 'Gerçek uygulamada bu konunun ders videosu sayfası açılacak.'}
       </p>
     </section>
-  )
-}
-
-interface RetentionRingProps {
-  caption: string
-  retention: number
-  presentation: RiskPresentation
-  persistence: PersistenceLabel
-}
-
-function RetentionRing({ caption, retention, presentation, persistence }: RetentionRingProps) {
-  const PersistenceIcon = persistence.icon
-
-  return (
-    <div className="flex flex-col items-center text-center">
-      <p className="section-subtitle">{caption}</p>
-      <div className="relative mt-2 size-24">
-        <svg viewBox="0 0 100 100" className="size-full -rotate-90" aria-hidden="true">
-          <circle cx="50" cy="50" r="42" fill="none" strokeWidth="9" className="stroke-line" />
-          <circle
-            cx="50"
-            cy="50"
-            r="42"
-            fill="none"
-            strokeWidth="9"
-            strokeLinecap="round"
-            stroke="currentColor"
-            pathLength={100}
-            strokeDasharray="100"
-            strokeDashoffset={100 - retention}
-            className={`${presentation.text} motion-safe:animate-ring-fill`}
-          />
-        </svg>
-        <span className="absolute inset-0 flex items-center justify-center text-2xl font-extrabold text-ink">
-          %{retention}
-        </span>
-      </div>
-      <span className={`badge ${presentation.badge} mt-2`}>{presentation.label}</span>
-      <p className={`mt-1.5 flex items-center gap-1 text-xs ${persistence.tone}`}>
-        {PersistenceIcon && <PersistenceIcon size={12} aria-hidden="true" />}
-        {persistence.text}
-      </p>
-    </div>
   )
 }
 

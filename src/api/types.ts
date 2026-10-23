@@ -1,27 +1,38 @@
-import type { ReviewResult, RiskLevel, SummaryPoint, TopicRisk } from '../types'
+import type { SummaryPoint } from '../types'
 
-/** One topic as evaluated by the backend; retention and risk are never recalculated in the UI. */
+/** Backend retention-model state of a topic */
+export type ReviewStatus = 'insufficient_data' | 'scheduled' | 'due' | 'support_needed'
+
+export type TestType = 'normal_test' | 'reminder_mini_quiz'
+
+/** One completed test with its actual score */
+export interface TestResult {
+  testType: TestType
+  /** ISO 8601 UTC timestamp */
+  completedAt: string
+  correctCount: number
+  totalQuestions: number
+}
+
+/** One topic as evaluated by the backend; status and review dates are never recalculated in the UI. */
 export interface TopicSummary {
   id: string
   title: string
   category: string
-  /** Display retention percentage (0–100) */
-  retention: number
-  riskLevel: RiskLevel
-  isFollowUp: boolean
-  /** Low first-test accuracy and no completed review: needs initial reinforcement, not a review */
-  needsInitialReinforcement: boolean
-  /** ISO 8601 UTC timestamp */
-  lastStudiedAt: string
-  reviewCount: number
-  successRate: number
+  reviewStatus: ReviewStatus
+  /** Latest relevant completed test (normal test or mini quiz); null without data */
+  latestTest: TestResult | null
+  /** When estimated recall reaches the review threshold (ISO 8601 UTC) */
+  nextReviewAt: string | null
+  /** Completion of the latest reminder + mini quiz review; normal tests never set it */
+  lastReviewedAt: string | null
 }
 
 /** GET /api/topics */
 export interface TopicsResponse {
   topics: TopicSummary[]
-  highestRiskTopicId: string | null
-  highRiskCount: number
+  /** Due topics in review priority order (support_needed and insufficient_data are not included) */
+  dueTopicIds: string[]
   /** Distinct topics with a review completed this week (Monday 00:00 Europe/Istanbul) up to evaluatedAt */
   weeklyReviewedTopicCount: number
   /** Instant the backend evaluated every topic at (ISO 8601 UTC) */
@@ -31,8 +42,6 @@ export interface TopicsResponse {
 /** GET /api/topics/{id}: a topic with its micro-review content, without quiz answers. */
 export interface TopicDetail extends TopicSummary {
   questionCount: number
-  /** First-test accuracy percentage (a test score, not measured recall); set only with needsInitialReinforcement */
-  initialTestAccuracy: number | null
   summaryPoints: SummaryPoint[]
   evaluatedAt: string
 }
@@ -63,19 +72,14 @@ export interface ReviewSession {
   answers: AnswerFeedback[]
 }
 
-/** The reviewed topic after completion, in the frontend Topic shape (memory fields only). */
+/** The reviewed topic after completion. */
 export interface CompletedTopic {
   id: string
   title: string
   category: string
-  lastStudiedDaysAgo: number
-  lastStudiedAt: string
-  previousSuccessRate: number
-  reviewCount: number
-  currentStrength: number
-  initialRecall: number
-  needsFollowUp: boolean
+  lastReviewedAt: string
 }
+
 
 /** POST /api/review-sessions/{id}/complete: the stored outcome, identical on every retry. */
 export interface ReviewCompletion {
@@ -83,24 +87,14 @@ export interface ReviewCompletion {
   score: number
   total: number
   updatedTopic: CompletedTopic
-  review: ReviewResult
-  retentionAtNextReview: number
-  /** riskAfter.retention − riskBefore.retention */
-  retentionGain: number
-  riskBefore: TopicRisk
-  riskAfter: TopicRisk
   completedAt: string
+  /** Where this quiz's curve reaches the threshold; completedAt when support is needed now */
   nextReviewAt: string
+  reviewStatus: ReviewStatus
+  testResult: TestResult
 }
 
 export type LoadState<T> =
   | { status: 'loading' }
   | { status: 'error'; message: string }
   | { status: 'ready'; data: T }
-
-const DAY_MS = 24 * 60 * 60 * 1000
-
-/** Whole days between the last study and the backend's evaluation instant, for display. */
-export function daysSinceStudied(topic: { lastStudiedAt: string }, evaluatedAt: string): number {
-  return Math.max(0, Math.floor((Date.parse(evaluatedAt) - Date.parse(topic.lastStudiedAt)) / DAY_MS))
-}

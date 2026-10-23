@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { errorMessage, getTopics, resetDemo } from '../api/client'
-import type { LoadState, ReviewCompletion, ReviewSession, TopicsResponse } from '../api/types'
+import type { LoadState, ReviewSession, TopicsResponse } from '../api/types'
 import DemoResetButton from '../components/DemoResetButton'
 import MemoryRiskCard from '../components/MemoryRiskCard'
 import MiniQuizModal from '../components/MiniQuizModal'
@@ -20,7 +20,6 @@ function HomePage() {
   // Modals remember the reset epoch they opened in; their results are dropped once a reset has started.
   const [detail, setDetail] = useState<{ topicId: string; epoch: number } | null>(null)
   const [quiz, setQuiz] = useState<{ session: ReviewSession; topicTitle: string; epoch: number } | null>(null)
-  const [lastReview, setLastReview] = useState<ReviewCompletion>()
   const [isResetting, setIsResetting] = useState(false)
   const [resetError, setResetError] = useState<string>()
 
@@ -61,10 +60,9 @@ function HomePage() {
     setQuiz(null)
   }
 
-  // The server stored the review: show its outcome on the card and reload the evaluated topics.
-  const handleReviewCompleted = (outcome: ReviewCompletion) => {
+  // The server stored the review: reload the evaluated topics, so the due list and weekly count follow it.
+  const handleReviewCompleted = () => {
     if (!quiz || !isCurrentEpoch(quiz.epoch)) return
-    setLastReview(outcome)
     reloadTopics()
   }
 
@@ -81,7 +79,6 @@ function HomePage() {
       resetEpoch.current++
       setDetail(null)
       setQuiz(null)
-      setLastReview(undefined)
     } catch (error) {
       setResetError(errorMessage(error))
     } finally {
@@ -112,7 +109,7 @@ function HomePage() {
           <aside className="flex flex-col gap-6" aria-label="Günlük plan">
             <JourneyCard />
             <MiniCalendar />
-            <MemoryRiskCard topics={topics} onRetry={reloadTopics} lastReview={lastReview} onStartReview={openDetail} />
+            <MemoryRiskCard topics={topics} onRetry={reloadTopics} onStartReview={openDetail} />
             <DailyProgram />
             {import.meta.env.DEV && (
               <DemoResetButton onReset={() => void handleResetDemo()} isResetting={isResetting} error={resetError} />

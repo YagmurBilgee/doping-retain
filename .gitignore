@@ -33,3 +33,13 @@ Thumbs.db
 
 # Test coverage
 coverage/
+
+# .NET build output
+backend/**/bin/
+backend/**/obj/
+
+# SQLite database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

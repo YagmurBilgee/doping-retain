@@ -18,7 +18,7 @@ public sealed class DemoClockTests
 
         Assert.Equal(first, second);
         Assert.Contains("\"evaluatedAt\":\"2026-10-21T09:00:00+00:00\"", first);
-        Assert.Contains("\"lastStudiedAt\":\"2026-10-10T09:00:00+00:00\"", first);
+        Assert.Contains("\"dueTopicIds\":[\"ayt-mat-trigonometri\",\"tyt-bio-hucre-bolunmeleri\",\"tyt-fiz-hareket-ve-kuvvet\"]", first);
     }
 
     [Fact]
@@ -62,30 +62,31 @@ public sealed class DemoClockTests
     }
 
     [Fact]
-    public void EnsureNotBeforeLastStudied_RejectsEarlierFixedTimeWithoutChangingRecords()
+    public void EnsureNotBeforeRecordedTests_RejectsEarlierFixedTimeWithoutChangingRecords()
     {
         using var database = new TemporaryDatabase();
         using (var db = database.CreateContext()) SeedData.Initialize(db, FixedInstant);
-        var before = ReadLastStudiedDates(database);
+        var before = ReadTestDates(database);
 
         using (var db = database.CreateContext())
         {
             var error = Assert.Throws<InvalidOperationException>(
-                () => DemoClock.EnsureNotBeforeLastStudied(db, FixedInstant.AddDays(-4)));
-            Assert.Contains("tyt-tur-sozcukte-anlam", error.Message);
+                // The latest seeded test (Kimya, 22/25) was completed about 5.4 days before seeding.
+                () => DemoClock.EnsureNotBeforeRecordedTests(db, FixedInstant.AddDays(-6)));
+            Assert.Contains("tyt-kim-atom-ve-periyodik-sistem", error.Message);
         }
 
-        Assert.Equal(before, ReadLastStudiedDates(database));
+        Assert.Equal(before, ReadTestDates(database));
     }
 
     [Fact]
-    public void EnsureNotBeforeLastStudied_AcceptsFixedTimeAtOrAfterLastStudied()
+    public void EnsureNotBeforeRecordedTests_AcceptsFixedTimeAtOrAfterRecordedTests()
     {
         using var database = new TemporaryDatabase();
         using var db = database.CreateContext();
         SeedData.Initialize(db, FixedInstant);
 
-        DemoClock.EnsureNotBeforeLastStudied(db, FixedInstant);
+        DemoClock.EnsureNotBeforeRecordedTests(db, FixedInstant);
     }
 
     private static async Task<string> SeedAndReadTopicsJson(TimeProvider clock)
@@ -94,13 +95,13 @@ public sealed class DemoClockTests
         using (var db = database.CreateContext()) SeedData.Initialize(db, clock.GetUtcNow());
 
         using var context = database.CreateContext();
-        var response = await TopicsQuery.GetTopicsAsync(context, SeedData.DemoStudentId, clock.GetUtcNow());
+        var response = await TopicsQuery.GetTopicsAsync(context, SeedData.DemoStudentId, clock.GetUtcNow(), TestOptions.Default);
         return JsonSerializer.Serialize(response, new JsonSerializerOptions(JsonSerializerDefaults.Web));
     }
 
-    private static Dictionary<string, DateTimeOffset> ReadLastStudiedDates(TemporaryDatabase database)
+    private static Dictionary<string, DateTimeOffset> ReadTestDates(TemporaryDatabase database)
     {
         using var db = database.CreateContext();
-        return db.StudentTopicStates.ToDictionary(state => state.TopicId, state => state.LastStudiedAt);
+        return db.TestResults.ToDictionary(result => result.TopicId, result => result.CompletedAt);
     }
 }

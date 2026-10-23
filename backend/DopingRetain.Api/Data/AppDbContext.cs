@@ -10,6 +10,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<StudentTopicState> StudentTopicStates => Set<StudentTopicState>();
     public DbSet<ReviewSession> ReviewSessions => Set<ReviewSession>();
     public DbSet<SessionAnswer> SessionAnswers => Set<SessionAnswer>();
+    public DbSet<TestResult> TestResults => Set<TestResult>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,6 +45,19 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             // The key makes each question answerable once per session.
             answer.HasKey(a => new { a.SessionId, a.QuestionId });
             answer.HasOne<QuizQuestion>().WithMany().HasForeignKey(a => a.QuestionId);
+        });
+
+        modelBuilder.Entity<TestResult>(result =>
+        {
+            result.Property(r => r.TestType).HasConversion<string>();
+            result.HasOne<Student>().WithMany().HasForeignKey(r => r.StudentId);
+            result.HasOne<Topic>().WithMany().HasForeignKey(r => r.TopicId);
+            result.HasOne<ReviewSession>().WithMany().HasForeignKey(r => r.ReviewSessionId);
+            // One stored result per completed review, however often completion is retried.
+            result.HasIndex(r => r.ReviewSessionId).IsUnique();
+            result.HasIndex(r => new { r.StudentId, r.TopicId });
+            result.ToTable(table => table.HasCheckConstraint(
+                "CK_TestResults_Score", "\"TotalQuestions\" > 0 AND \"CorrectCount\" >= 0 AND \"CorrectCount\" <= \"TotalQuestions\""));
         });
     }
 }

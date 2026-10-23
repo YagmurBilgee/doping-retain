@@ -3,7 +3,7 @@ using DopingRetain.Api.Data;
 using DopingRetain.Api.Demo;
 using DopingRetain.Api.Memory;
 using DopingRetain.Api.Reviews;
-using DopingRetain.Api.Tests.Fixtures;
+using DopingRetain.Api.TestResults;
 using DopingRetain.Api.Topics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -15,7 +15,7 @@ public sealed class ReviewCompletionTests : IDisposable
     private const string Trigonometry = "ayt-mat-trigonometri";
     private const double Tolerance = 1e-9;
 
-    // Seeding and completing at the same instant gives t = 11 days exactly, as in the TypeScript fixture.
+    // Seeding and completing at the same instant: Trigonometri's synthetic 18/20 normal test is due.
     private static readonly DateTimeOffset Now = new(2026, 10, 21, 9, 0, 0, TimeSpan.Zero);
 
     private static readonly (string QuestionId, int Correct, int Wrong)[] Questions =
@@ -35,52 +35,42 @@ public sealed class ReviewCompletionTests : IDisposable
 
     public void Dispose() => _database.Dispose();
 
+    // The quiz score itself is the new observation: 3/3 → 10 days, 2/3 → 10 · log2(0.667 / 0.5) ≈ 4.15 days,
+    // 1/3 and 0/3 are at or below the threshold and need support now.
     [Theory]
-    [InlineData(0)]
-    [InlineData(1)]
-    [InlineData(2)]
-    [InlineData(3)]
-    public async Task Complete_Trigonometry_MatchesTypeScriptOutcomeAndPersistsIt(int score)
+    [InlineData(3, ReviewStatus.Scheduled)]
+    [InlineData(2, ReviewStatus.Scheduled)]
+    [InlineData(1, ReviewStatus.SupportNeeded)]
+    [InlineData(0, ReviewStatus.SupportNeeded)]
+    public async Task Complete_Trigonometry_StoresActualScoreAndSchedulesFromTheCurve(int score, ReviewStatus status)
     {
-        var expected = MemoryModelFixture.Instance.Reviews.Single(c => c.Name == $"Trigonometri {score}/3").Expected;
         var sessionId = await StartAndAnswer(correctCount: score);
 
         var result = await Complete(sessionId);
 
         Assert.Equal(200, result.StatusCode);
         var outcome = result.Value!;
+        var accuracy = score / 3.0;
+        var expectedNextReviewAt = accuracy > 0.5 ? Now.AddDays(10 * Math.Log2(accuracy / 0.5)) : Now;
         Assert.Equal((score, 3), (outcome.Score, outcome.Total));
-        Assert.Equal(expected.Review.Tier, outcome.Review.Tier);
-        Assert.Equal(expected.Review.NextReviewInDays, outcome.Review.NextReviewInDays);
-        Assert.Equal(expected.Review.NewStrength, outcome.Review.NewStrength, Tolerance);
-        Assert.Equal(expected.RetentionAtNextReview, outcome.RetentionAtNextReview);
-        Assert.Equal(expected.RetentionGain, outcome.RetentionGain);
-        Assert.Equal(expected.RiskAfter, outcome.RiskAfter);
-        var riskBeforeReview = MemoryModelFixture.Instance.TopicRisks.Single(c => c.Name == Trigonometry).Expected;
-        Assert.Equal(riskBeforeReview, outcome.RiskBefore);
-        Assert.Equal(outcome.RetentionGain, outcome.RiskAfter.Retention - outcome.RiskBefore.Retention);
-
-        var topic = outcome.UpdatedTopic;
-        Assert.Equal((Trigonometry, 0d, Now), (topic.Id, topic.LastStudiedDaysAgo, topic.LastStudiedAt));
-        Assert.Equal(expected.UpdatedTopic.CurrentStrength, topic.CurrentStrength, Tolerance);
-        Assert.Equal(expected.UpdatedTopic.InitialRecall!.Value, topic.InitialRecall, Tolerance);
-        Assert.Equal(expected.UpdatedTopic.PreviousSuccessRate, topic.PreviousSuccessRate, Tolerance);
-        Assert.Equal(expected.UpdatedTopic.ReviewCount, topic.ReviewCount);
-        Assert.Equal(expected.UpdatedTopic.NeedsFollowUp ?? false, topic.NeedsFollowUp);
-
-        // NextReviewAt follows the 2 / 7 / 14-day rule from the completion instant.
+        Assert.Equal(status, outcome.ReviewStatus);
+        Assert.Equal(new TestResultDto(TestType.ReminderMiniQuiz, Now, score, 3), outcome.TestResult);
         Assert.Equal(Now, outcome.CompletedAt);
-        Assert.Equal(Now.AddDays(expected.Review.NextReviewInDays), outcome.NextReviewAt);
+        Assert.Equal(expectedNextReviewAt, outcome.NextReviewAt);
+        Assert.True(outcome.NextReviewAt >= outcome.CompletedAt);
+        Assert.Equal(new CompletedTopicDto(Trigonometry, "Trigonometri", "AYT Matematik", Now), outcome.UpdatedTopic);
 
         using var db = _database.CreateContext();
         var state = db.StudentTopicStates.Single(s => s.TopicId == Trigonometry);
-        Assert.Equal(
-            (topic.CurrentStrength, topic.InitialRecall, Now, topic.ReviewCount, topic.PreviousSuccessRate, topic.NeedsFollowUp, 1),
-            (state.Strength, state.InitialRecall, state.LastStudiedAt, state.ReviewCount, state.SuccessRate, state.NeedsFollowUp, state.Version));
+        Assert.Equal(((DateTimeOffset?)Now, 1), (state.LastReviewedAt, state.Version));
         var session = db.ReviewSessions.Single();
         Assert.Equal(
             (ReviewSessionStatus.Completed, (DateTimeOffset?)Now, (DateTimeOffset?)outcome.NextReviewAt),
             (session.Status, session.CompletedAt, session.NextReviewAt));
+        // The original normal test stays; the mini quiz is added next to it with its real score and sample size.
+        Assert.Equal(
+            new[] { $"NormalTest|{SeedCompletedAt(Trigonometry):O}|18/20|", $"ReminderMiniQuiz|{Now:O}|{score}/3|{sessionId}" },
+            ReadTestResults());
     }
 
     [Fact]
@@ -109,7 +99,7 @@ public sealed class ReviewCompletionTests : IDisposable
         Assert.Equal(200, retry.StatusCode);
         Assert.Equal(Serialize(first.Value), Serialize(retry.Value));
         Assert.Equal(afterFirst, Snapshot());
-        Assert.Equal((2, 1), ReadReviewCountAndVersion());
+        Assert.Equal((1, 1), ReadMiniQuizCountAndVersion());
     }
 
     [Fact]
@@ -121,7 +111,7 @@ public sealed class ReviewCompletionTests : IDisposable
 
         Assert.All(results, result => Assert.Equal(200, result.StatusCode));
         Assert.Single(results.Select(result => Serialize(result.Value)).Distinct());
-        Assert.Equal((2, 1), ReadReviewCountAndVersion());
+        Assert.Equal((1, 1), ReadMiniQuizCountAndVersion());
     }
 
     [Fact]
@@ -196,21 +186,29 @@ public sealed class ReviewCompletionTests : IDisposable
     }
 
     [Fact]
-    public async Task Topics_ReflectPersistedStateAfterCompletion()
+    public async Task Topics_ReflectTheMiniQuizAsLatestTestAndItsReviewDate()
     {
-        var expected = MemoryModelFixture.Instance.Reviews.Single(c => c.Name == "Trigonometri 3/3").Expected;
         await Complete(await StartAndAnswer(correctCount: 3));
 
         using var db = _database.CreateContext();
-        var now = await TopicsQuery.GetTopicsAsync(db, SeedData.DemoStudentId, Now);
-        var atNextReview = await TopicsQuery.GetTopicsAsync(db, SeedData.DemoStudentId, Now.AddDays(14));
+        var now = await TopicsQuery.GetTopicsAsync(db, SeedData.DemoStudentId, Now, TestOptions.Default);
+        var beforeThreshold = await TopicsQuery.GetTopicsAsync(db, SeedData.DemoStudentId, Now.AddDays(10).AddMinutes(-1), TestOptions.Default);
+        var atThreshold = await TopicsQuery.GetTopicsAsync(db, SeedData.DemoStudentId, Now.AddDays(10), TestOptions.Default);
 
         var trigonometry = now.Topics.Single(t => t.Id == Trigonometry);
-        Assert.Equal((100, RiskLevel.Safe, Now, 2), (trigonometry.Retention, trigonometry.RiskLevel, trigonometry.LastStudiedAt, trigonometry.ReviewCount));
-        Assert.Equal(expected.UpdatedTopic.PreviousSuccessRate, trigonometry.SuccessRate, Tolerance);
-        Assert.Null(now.HighestRiskTopicId);
-        Assert.Equal(0, now.HighRiskCount);
-        Assert.Equal(expected.RetentionAtNextReview, atNextReview.Topics.Single(t => t.Id == Trigonometry).Retention);
+        Assert.Equal(ReviewStatus.Scheduled, trigonometry.ReviewStatus);
+        Assert.Equal(new TestResultDto(TestType.ReminderMiniQuiz, Now, 3, 3), trigonometry.LatestTest);
+        Assert.Equal(((DateTimeOffset?)Now, (DateTimeOffset?)Now.AddDays(10)), (trigonometry.LastReviewedAt, trigonometry.NextReviewAt));
+        // Trigonometri leaves the due list; the other two due topics stay, in their order.
+        Assert.Equal(new[] { "tyt-bio-hucre-bolunmeleri", "tyt-fiz-hareket-ve-kuvvet" }, now.DueTopicIds);
+
+        Assert.Equal(ReviewStatus.Scheduled, beforeThreshold.Topics.Single(t => t.Id == Trigonometry).ReviewStatus);
+        Assert.Equal(ReviewStatus.Due, atThreshold.Topics.Single(t => t.Id == Trigonometry).ReviewStatus);
+        // Ten days on, every seeded normal test has crossed the threshold too; the earlier a topic crossed,
+        // the further its recall has decayed, so it comes first. Trigonometri crosses exactly now.
+        Assert.Equal(
+            new[] { "tyt-bio-hucre-bolunmeleri", "tyt-fiz-hareket-ve-kuvvet", "tyt-tur-sozcukte-anlam", "tyt-kim-atom-ve-periyodik-sistem", Trigonometry },
+            atThreshold.DueTopicIds);
     }
 
     [Fact]
@@ -232,13 +230,37 @@ public sealed class ReviewCompletionTests : IDisposable
             $"SELECT COUNT(*) AS Value FROM pragma_table_info('StudentTopicStates') WHERE name = 'Version'").Single());
     }
 
+    [Fact]
+    public void Initialize_OnPhase5Database_FailsWithoutCreatingTestResults()
+    {
+        // A Phase 5 file has no TestResults table and no LastReviewedAt column; its old memory values
+        // cannot be turned into test results, so the file is rejected rather than migrated.
+        using (var db = _database.CreateContext())
+        {
+            db.Database.ExecuteSqlRaw("DROP TABLE TestResults; ALTER TABLE StudentTopicStates DROP COLUMN LastReviewedAt;");
+        }
+
+        using (var db = _database.CreateContext())
+        {
+            var error = Assert.Throws<InvalidOperationException>(() => SeedData.Initialize(db, Now));
+            Assert.Contains("StudentTopicStates.LastReviewedAt", error.Message);
+            Assert.Contains("TestResults.CorrectCount", error.Message);
+            Assert.Contains("Point Database:Path at a new file", error.Message);
+        }
+
+        using var check = _database.CreateContext();
+        Assert.Equal(0, check.Database.SqlQuery<int>(
+            $"SELECT COUNT(*) AS Value FROM sqlite_master WHERE name = 'TestResults'").Single());
+        Assert.Equal(5, check.StudentTopicStates.Count());
+    }
+
     private async Task<Guid> StartAndAnswer(int correctCount, int answerCount = 3, TemporaryDatabase? database = null)
     {
         database ??= _database;
         Guid sessionId;
         using (var db = database.CreateContext())
         {
-            sessionId = (await new ReviewSessionService(db, ClockAt(Now)).StartOrResumeAsync(Trigonometry)).Value!.SessionId;
+            sessionId = (await new ReviewSessionService(db, ClockAt(Now), TestOptions.Default).StartOrResumeAsync(Trigonometry)).Value!.SessionId;
         }
 
         foreach (var (question, index) in Questions.Take(answerCount).Select((question, index) => (question, index)))
@@ -253,32 +275,45 @@ public sealed class ReviewCompletionTests : IDisposable
         Guid sessionId, DateTimeOffset? at = null, TemporaryDatabase? database = null)
     {
         using var db = (database ?? _database).CreateContext();
-        return await new ReviewSessionService(db, ClockAt(at ?? Now)).CompleteAsync(sessionId);
+        return await new ReviewSessionService(db, ClockAt(at ?? Now), TestOptions.Default).CompleteAsync(sessionId);
     }
 
     private async Task<ServiceResult<AnswerFeedbackDto>> Answer(
         Guid sessionId, string questionId, int selectedIndex, IInterceptor? interceptor = null, TemporaryDatabase? database = null)
     {
         using var db = interceptor is null ? (database ?? _database).CreateContext() : _database.CreateContext(interceptor);
-        return await new ReviewSessionService(db, ClockAt(Now)).SubmitAnswerAsync(sessionId, new SubmitAnswerRequest(questionId, selectedIndex));
+        return await new ReviewSessionService(db, ClockAt(Now), TestOptions.Default).SubmitAnswerAsync(sessionId, new SubmitAnswerRequest(questionId, selectedIndex));
     }
 
-    /// <summary>Every persisted value completion may write: memory state and session completion fields.</summary>
+    /// <summary>Every persisted value completion may write: review dates, test results and session completion fields.</summary>
     private string Snapshot()
     {
         using var db = _database.CreateContext();
         var states = db.StudentTopicStates.AsNoTracking().AsEnumerable().OrderBy(s => s.TopicId)
-            .Select(s => $"{s.TopicId}|{s.Strength}|{s.InitialRecall}|{s.LastStudiedAt:O}|{s.ReviewCount}|{s.SuccessRate}|{s.NeedsFollowUp}|{s.Version}");
+            .Select(s => $"{s.TopicId}|{s.LastReviewedAt:O}|{s.Version}");
+        var results = db.TestResults.AsNoTracking().OrderBy(r => r.Id).AsEnumerable()
+            .Select(r => $"{r.Id}|{r.TopicId}|{r.TestType}|{r.CompletedAt:O}|{r.CorrectCount}/{r.TotalQuestions}|{r.ReviewSessionId}");
         var sessions = db.ReviewSessions.AsNoTracking().AsEnumerable().OrderBy(s => s.Id)
             .Select(s => $"{s.Id}|{s.Status}|{s.CompletedAt:O}|{s.NextReviewAt:O}|{s.OutcomeJson}");
-        return string.Join("\n", states.Concat(sessions));
+        return string.Join("\n", states.Concat(results).Concat(sessions));
     }
 
-    private (int ReviewCount, int Version) ReadReviewCountAndVersion()
+    private (int MiniQuizResults, int Version) ReadMiniQuizCountAndVersion()
     {
         using var db = _database.CreateContext();
         var state = db.StudentTopicStates.Single(s => s.TopicId == Trigonometry);
-        return (state.ReviewCount, state.Version);
+        return (db.TestResults.Count(r => r.TopicId == Trigonometry && r.TestType == TestType.ReminderMiniQuiz), state.Version);
+    }
+
+    private static DateTimeOffset SeedCompletedAt(string topicId) =>
+        SeedData.CreateSeedTestResults(Now).Single(result => result.TopicId == topicId).CompletedAt;
+
+    private List<string> ReadTestResults()
+    {
+        using var db = _database.CreateContext();
+        return db.TestResults.AsNoTracking().Where(r => r.TopicId == Trigonometry).OrderBy(r => r.Id).AsEnumerable()
+            .Select(r => $"{r.TestType}|{r.CompletedAt:O}|{r.CorrectCount}/{r.TotalQuestions}|{r.ReviewSessionId}")
+            .ToList();
     }
 
     private int CountAnswers()

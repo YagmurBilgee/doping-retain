@@ -42,23 +42,23 @@ public static class DemoClock
     }
 
     /// <summary>
-    /// Fails when the fixed instant precedes any stored LastStudiedAt: the model would otherwise
-    /// clamp the negative elapsed time to zero and report misleading retention.
+    /// Fails when the fixed instant precedes any stored test completion: the model would otherwise
+    /// clamp the negative elapsed time to zero and report a misleading estimate.
     /// </summary>
-    public static void EnsureNotBeforeLastStudied(AppDbContext db, DateTimeOffset now)
+    public static void EnsureNotBeforeRecordedTests(AppDbContext db, DateTimeOffset now)
     {
         // SQLite cannot compare DateTimeOffset in SQL, so the few rows are checked in memory.
-        var later = db.StudentTopicStates
-            .Select(state => new { state.StudentId, state.TopicId, state.LastStudiedAt })
+        var later = db.TestResults
+            .Select(result => new { result.StudentId, result.TopicId, result.CompletedAt })
             .AsEnumerable()
-            .Where(state => state.LastStudiedAt > now)
+            .Where(result => result.CompletedAt > now)
             .ToList();
 
         if (later.Count == 0) return;
 
-        var details = string.Join(", ", later.Select(state => $"{state.StudentId}/{state.TopicId} at {state.LastStudiedAt:O}"));
+        var details = string.Join(", ", later.Select(result => $"{result.StudentId}/{result.TopicId} at {result.CompletedAt:O}"));
         throw new InvalidOperationException(
-            $"{FixedUtcNowKey} ({now:O}) is earlier than persisted LastStudiedAt values: {details}. " +
+            $"{FixedUtcNowKey} ({now:O}) is earlier than recorded test completions: {details}. " +
             "Use a later timestamp or a separate fresh database (Database:Path).");
     }
 

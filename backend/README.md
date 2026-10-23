@@ -24,7 +24,6 @@ In development the Vite server (`npm run dev` in the repository root) proxies `/
 `http://localhost:5080`, so run the API alongside it. The homepage risk card, the topic detail
 modal, the mini quiz (review sessions, answers, completion) and the dev-only "Demoyu Sıfırla" button
 (Alt+Shift+R) all use the API; the app bundle contains no answer keys or local scoring.
-`src/utils/memoryModel.ts` and `src/data/mockTopics.ts` remain only as the source of the parity fixture.
 
 ## Tests
 
@@ -33,51 +32,71 @@ cd backend
 dotnet test DopingRetain.Api.Tests
 ```
 
-- `MemoryModelParityTests` compare the C# memory model with outputs recorded from
-  `src/utils/memoryModel.ts`. After changing the TypeScript model, regenerate the fixture
-  from the repository root:
-
-  ```sh
-  node --experimental-strip-types --no-warnings backend/DopingRetain.Api.Tests/Fixtures/generate-memory-model-fixtures.ts
-  ```
-
-- `TopicsPersistenceTests`, `DemoClockTests`, `ReviewSessionServiceTests`, `ReviewCompletionTests` and
-  `DemoResetTests` use a temporary SQLite file per test and never touch the development database.
+- `RetentionModelTests` cover the pure formula and schedule.
+- `TopicsPersistenceTests`, `DemoClockTests`, `ReviewSessionServiceTests`, `ReviewCompletionTests`,
+  `DemoResetTests`, `WeeklyReviewedTopicsTests` and `TestResultServiceTests` use a temporary SQLite file
+  per test and never touch the development database.
 
 ## Persistence
 
-- **Location:** `Database:Path` in `appsettings.json` (default `App_Data/retain-phase5.db`).
+- **Location:** `Database:Path` in `appsettings.json` (default `App_Data/retain-phase6.db`).
   A relative path resolves against the content root, which `dotnet run --project DopingRetain.Api`
   sets to the project folder from any shell directory, so the default database is
-  `backend/DopingRetain.Api/App_Data/retain-phase5.db`. An absolute path is used as is.
+  `backend/DopingRetain.Api/App_Data/retain-phase6.db`. An absolute path is used as is.
   The startup log prints the database path in use.
 - **Schema:** created with `EnsureCreated` on startup; there are no migrations.
   `EnsureCreated` does nothing when the file already exists, so each schema change uses a new file.
   If the configured file lacks a table or column of the current schema, startup fails and lists the
   missing columns; the file is never altered or deleted.
-- **Seed:** runs only when the database has no student. It captures one UTC timestamp and sets each
-  topic's `LastStudiedAt` to that time minus the topic's `lastStudiedDaysAgo` from
-  `src/data/mockTopics.ts`. Restarts keep existing rows and dates, so with the system clock
-  retention keeps decaying: the 46 / 55 / 86 / 51 % values hold only shortly after the first seed.
+- **Seed (demo scenario):** runs only when the database has no student; the demo reset restores the same
+  scenario. Five topics from five subjects each get one **synthetic** normal-test result (made-up demo
+  data, not a real student's). Its completion time is derived backwards from the moment its curve should
+  reach the review threshold (`completedAt = target − h · log2(A / threshold)`), using one reference
+  instant and the Europe/Istanbul calendar day; timestamps are stored in UTC.
+
+  | Topic | Score | Threshold reached |
+  |---|---|---|
+  | Trigonometri (AYT Matematik) | 18/20 | today, ¼ of the way from 00:00 to now |
+  | Hücre Bölünmeleri (TYT Biyoloji) | 16/20 | today, ½ of the way |
+  | Hareket ve Kuvvet (TYT Fizik) | 11/15 | today, ¾ of the way |
+  | Sözcükte Anlam (TYT Türkçe) | 19/20 | tomorrow 10:00 |
+  | Atom ve Periyodik Sistem (TYT Kimya) | 22/25 | in three days, 10:00 |
+
+  So three topics are due (also just after midnight), one is scheduled for tomorrow, one for three days
+  later, and no review is completed yet. Restarts keep existing rows and dates, so with the system clock
+  the statuses keep changing. `ayt-mat-fonksiyonlar` stays as content but is not assigned to the student.
+  Every topic has three reminder points (served from `SeedData`) and three quiz questions. On an existing
+  database, startup adds only the demo topics and questions it lacks (matched by Id); student data,
+  results, sessions and existing content are never changed, and a second start adds nothing. An existing
+  database gets the new scenario only through the explicit demo reset (`POST /api/demo/reset`, Alt+Shift+R).
 - **Earlier databases** (kept, no longer used by default):
+  - `App_Data/retain-phase5.db`: Phase 5 schema with the old stability model. Phase 6 added the
+    `TestResults` table and `StudentTopicStates.LastReviewedAt`. Its stored R0/S values cannot be turned
+    into real test results, so it is not migrated; setting `Database:Path` to it fails at startup.
   - `App_Data/retain-phase4.db` (if created): Phase 4 schema. Phase 5 added `StudentTopicStates.Version`
     and `ReviewSessions.StateVersionAtStart`, `CompletedAt`, `NextReviewAt`, `OutcomeJson`.
   - `App_Data/retain.db`: Phase 3 schema, without review-session tables. Setting `Database:Path` to it fails at startup.
   - `bin/Debug/net8.0/App_Data/doping-retain.db`: the original location, copied to `App_Data/retain.db`
     with SQLite's backup API.
 
-## Initial memory state from a first test (not wired in yet)
+## Retention model
 
-`InitialMemoryState.FromFirstAttemptTest` (`Memory/InitialMemoryState.cs`) builds a new topic state from
-one test result: `InitialRecall = correctCount / questionCount` (unrounded), `Strength = 14` days,
-`LastStudiedAt` = completion time in UTC, and empty review fields. It is a pure function with no
-endpoint, table or seed connection; the demo data and percentages are unchanged.
+`R(t) = A · 2^(−t / h)` (`Memory/RetentionModel.cs`, pure). `A` is correct / total of the topic's latest
+completed test (normal test or reminder mini quiz, by completion time; equal times go to the later
+recorded result), `t` is days since that test, and the review is due where the same curve reaches the
+threshold: `t* = h · log2(A / threshold)`. A score at or below the threshold needs support now; a topic
+without a test has insufficient data.
 
-- Only single-topic, first-attempt, post-learning tests qualify. The caller resolves the topic and uses
-  the result only when the student has no state for that topic; repeated attempts are not handled.
-- Mixed-topic tests need a question-to-topic mapping first.
-- `S = 14` is an unvalidated starting assumption.
-- Test accuracy is a proxy for initial recall, not a direct measurement of memory.
+`RetentionModel:HalfLifeDays` (10) and `RetentionModel:ReviewThreshold` (0.50) in `appsettings.json` are
+provisional, shared demo assumptions, not scientific constants; nothing learns or personalizes them.
+
+## Normal test results (demo integration contract)
+
+`POST /api/topics/{id}/test-results` with `{ "correctCount", "totalQuestions", "completedAt" }`
+(ISO 8601 with an offset) records a normal test for the demo student. It is a minimal demo contract,
+not an existing company integration. It updates the topic's test observation only: it does not complete
+a review, so `lastReviewedAt` and the weekly review count are unchanged. Future completion times and
+invalid scores are rejected.
 
 ## Fixed demo clock (Development only)
 
@@ -92,14 +111,14 @@ dotnet run --project DopingRetain.Api -- \
   --Database:Path=App_Data/retain-fixed-demo.db
 ```
 
-This returns 46 / 55 / 86 / 51 % with `evaluatedAt` = `2026-10-21T09:00:00+00:00` on every run.
+This returns the same statuses and review dates with `evaluatedAt` = `2026-10-21T09:00:00+00:00` on every run.
 The same settings can come from environment variables (`Demo__FixedUtcNow`, `Database__Path`).
 
 Startup fails instead of guessing when:
 
 - the environment is not Development and `Demo:FixedUtcNow` is set;
 - the value is not a valid timestamp with an offset;
-- the fixed instant is earlier than a stored `LastStudiedAt` (for example, an older fixed time
+- the fixed instant is earlier than a stored test completion (for example, an older fixed time
   against the regular database). Records are never modified; use a later time or another database.
 
 Do not reuse a fixed-clock database with the system clock if its timestamp lies in the future.
@@ -111,13 +130,14 @@ Do not reuse a fixed-clock database with the system clock if its timestamp lies 
 | GET    | `/api/health` | `200 {"status":"ok"}` |
 | GET    | `/api/topics` | Demo student's topics evaluated at one instant (`evaluatedAt`), in display order |
 | GET    | `/api/topics/{id}` | One topic with its micro-review content (`404 topic_not_found` if unknown) |
+| POST   | `/api/topics/{id}/test-results` | Demo contract: record a normal test, `201` (`400 invalid_request` / `invalid_score` / `future_completion`, `404 topic_not_found`) |
 | POST   | `/api/topics/{id}/review-sessions` | Start or resume a review session (see below) |
 | POST   | `/api/review-sessions/{id}/answers` | Record one answer and return its feedback (see below) |
 | POST   | `/api/review-sessions/{id}/complete` | Complete a fully answered session (see below) |
 | POST   | `/api/demo/reset` | Development only: reset the demo student's learning data, `204` (see below) |
 
-Review sessions belong to the seeded demo student. Starting or answering never changes memory state
-(strength, recall, `LastStudiedAt`, review count, success rate); only completion does.
+Review sessions belong to the seeded demo student. Starting or answering never stores a test result or a
+review date; only completion does.
 
 | Method | Path | Success | Errors |
 |--------|------|---------|--------|
@@ -138,16 +158,15 @@ Review sessions belong to the seeded demo student. Starting or answering never c
 - At most one open session exists per student and topic, and each question is answered once per session;
   both rules are database constraints, so concurrent duplicate requests resolve to the stored row.
 - Completion takes no request body. The score comes from the stored answers and every question must be
-  answered. One timestamp is used for the whole completion. The updated memory state, the session's
-  `Completed` status, `CompletedAt`, `NextReviewAt` (completion + 2 / 7 / 14 days) and the outcome
-  snapshot are saved in one transaction. A completed session returns that snapshot unchanged.
-- The outcome has the frontend `ReviewOutcome` fields (`updatedTopic` in the `Topic` shape without
-  quiz content, `review`, `retentionAtNextReview`, `retentionGain`), plus `sessionId`, `score`, `total`,
-  `riskBefore`, `riskAfter`, `completedAt`, `nextReviewAt` and `updatedTopic.lastStudiedAt`. Both risks are
-  evaluated at the completion instant, so `riskAfter.retention - riskBefore.retention` is `retentionGain`.
+  answered. One timestamp is used for the whole completion. The quiz's actual score is stored as a
+  `reminder_mini_quiz` test result (unique per session), the topic's `LastReviewedAt` is set, and the
+  session's `Completed` status, `CompletedAt`, `NextReviewAt` (from the retention model) and the outcome
+  snapshot are saved in one transaction. A completed session returns that snapshot unchanged and stores nothing.
+- The outcome has `sessionId`, `score`, `total`, `reviewStatus`, `testResult`, `completedAt`,
+  `nextReviewAt` and `updatedTopic` (`id`, `title`, `category`, `lastReviewedAt`).
 - Concurrency: completion runs in a `BEGIN IMMEDIATE` transaction, so it and answer inserts never
   interleave; an answer is inserted only while its session is `Open` (one SQL statement). Completion
-  updates the memory state only if its `Version` still equals the version stored when the session
+  writes only if the topic state's `Version` still equals the version stored when the session
   started, then increments it; otherwise it returns `409 stale_session` and writes nothing.
 - Errors use one body shape: `{"code": "...", "message": "..."}`.
 
@@ -156,9 +175,10 @@ Review sessions belong to the seeded demo student. Starting or answering never c
 `POST /api/demo/reset` exists only in the Development environment; elsewhere it returns `404`.
 In one `BEGIN IMMEDIATE` transaction it:
 
-- deletes the demo student's review sessions and their answers;
-- restores each of the student's topic states to the seed values in `SeedData`, with `LastStudiedAt`
-  counted back from one timestamp of the app clock (so a fixed demo clock gives 46 / 55 / 86 / 51 %);
+- deletes the demo student's test results, review sessions and their answers;
+- aligns the student's topics with the five demo topics (others are unassigned, their content stays),
+  clears each topic's `LastReviewedAt` and re-adds the seed's synthetic normal-test results for one
+  timestamp of the app clock (so a fixed demo clock always gives the same statuses);
 - increments each topic state's `Version`, so nothing captured before the reset can match afterwards.
 
 Topic content, questions and the student record stay; the database file is never deleted or recreated.
@@ -169,7 +189,8 @@ session gone and get `404 session_not_found`.
 (`icon`, `tag`, `text`, optional `note`) and `evaluatedAt`. The summary points are static demo content
 served from `SeedData`, not stored in the database. Quiz answers and explanations are not included.
 
-`GET /api/topics` returns, per topic, `id`, `title`, `category`, `retention` (display percentage),
-`riskLevel` (`safe` / `review_soon` / `high_risk`, from unrounded retention), `isFollowUp`,
-`lastStudiedAt` (UTC), `reviewCount` and `successRate`, plus `highestRiskTopicId` and `highRiskCount`.
+`GET /api/topics` returns, per topic, `id`, `title`, `category`, `reviewStatus` (`insufficient_data` /
+`scheduled` / `due` / `support_needed`), `latestTest` (`testType`, `completedAt`, `correctCount`,
+`totalQuestions`), `nextReviewAt` and `lastReviewedAt`, plus `dueTopicIds` (due topics in review priority
+order: lowest unrounded recall first, ties in display order) and `weeklyReviewedTopicCount`.
 Quiz answers and explanations are never included.

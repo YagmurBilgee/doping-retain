@@ -99,7 +99,7 @@ public sealed class WeeklyReviewedTopicsTests : IDisposable
         var clock = DemoClock.Create("2026-10-21T09:00:00Z", isDevelopment: true);
         using (var db = _database.CreateContext())
         {
-            var sessions = new ReviewSessionService(db, clock);
+            var sessions = new ReviewSessionService(db, clock, TestOptions.Default);
             var session = (await sessions.StartOrResumeAsync(Trigonometry)).Value!;
             foreach (var question in session.Questions)
             {
@@ -117,7 +117,7 @@ public sealed class WeeklyReviewedTopicsTests : IDisposable
     private async Task<int> CountAt(DateTimeOffset now)
     {
         using var db = _database.CreateContext();
-        return (await TopicsQuery.GetTopicsAsync(db, SeedData.DemoStudentId, now)).WeeklyReviewedTopicCount;
+        return (await TopicsQuery.GetTopicsAsync(db, SeedData.DemoStudentId, now, TestOptions.Default)).WeeklyReviewedTopicCount;
     }
 
     private void AddSession(string topicId, ReviewSessionStatus status, DateTimeOffset? completedAt)

@@ -70,7 +70,13 @@ public sealed class ReviewSessionServiceTests : IDisposable
     [Fact]
     public async Task Start_TopicWithoutQuestions_Returns409()
     {
-        var result = await Start("tyt-bio-hucre-bolunmeleri");
+        using (var db = _database.CreateContext())
+        {
+            db.Topics.Add(new Topic { Id = "no-quiz", Title = "No quiz", Category = "Test", SortOrder = 100 });
+            db.SaveChanges();
+        }
+
+        var result = await Start("no-quiz");
 
         Assert.Equal(409, result.StatusCode);
         Assert.Equal("topic_has_no_questions", result.Error!.Code);
@@ -236,7 +242,7 @@ public sealed class ReviewSessionServiceTests : IDisposable
     private async Task<ServiceResult<ReviewSessionResponse>> Start(string topicId = Trigonometry, params IInterceptor[] interceptors)
     {
         using var db = _database.CreateContext(interceptors);
-        return await new ReviewSessionService(db, Clock).StartOrResumeAsync(topicId);
+        return await new ReviewSessionService(db, Clock, TestOptions.Default).StartOrResumeAsync(topicId);
     }
 
     private Task<ServiceResult<AnswerFeedbackDto>> Answer(
@@ -247,7 +253,7 @@ public sealed class ReviewSessionServiceTests : IDisposable
         Guid sessionId, SubmitAnswerRequest request, params IInterceptor[] interceptors)
     {
         using var db = _database.CreateContext(interceptors);
-        return await new ReviewSessionService(db, Clock).SubmitAnswerAsync(sessionId, request);
+        return await new ReviewSessionService(db, Clock, TestOptions.Default).SubmitAnswerAsync(sessionId, request);
     }
 
     private int CountRows<T>(Func<AppDbContext, IQueryable<T>> table)
@@ -263,8 +269,8 @@ public sealed class ReviewSessionServiceTests : IDisposable
             .AsNoTracking()
             .AsEnumerable()
             .OrderBy(state => state.TopicId)
-            .Select(state => $"{state.TopicId}|{state.Strength}|{state.InitialRecall}|{state.LastStudiedAt:O}|" +
-                $"{state.ReviewCount}|{state.SuccessRate}|{state.NeedsFollowUp}")
+            .Select(state => $"{state.TopicId}|{state.LastReviewedAt:O}|{state.Version}")
+            .Append($"test results: {db.TestResults.Count()}")
             .ToList();
     }
 

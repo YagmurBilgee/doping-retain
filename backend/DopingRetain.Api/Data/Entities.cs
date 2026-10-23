@@ -32,29 +32,58 @@ public sealed class QuizQuestion
     public string? Explanation { get; set; }
 }
 
-/// <summary>One student's memory state for one topic: the inputs of the memory model.</summary>
+/// <summary>
+/// Per-student, per-topic review bookkeeping. The memory estimate itself comes from <see cref="TestResult"/>.
+/// </summary>
 public sealed class StudentTopicState
 {
     public required string StudentId { get; init; }
     public required string TopicId { get; init; }
     public Topic Topic { get; init; } = null!;
 
-    /// <summary>Memory stability S in days.</summary>
-    public double Strength { get; set; }
-    /// <summary>Initial recall R0 (0–1) right after the last study session.</summary>
-    public double InitialRecall { get; set; }
-    /// <summary>Last study or review time, always UTC.</summary>
-    public DateTimeOffset LastStudiedAt { get; set; }
-    public int ReviewCount { get; set; }
-    /// <summary>0–1 running average of review score ratios.</summary>
-    public double SuccessRate { get; set; }
-    public bool NeedsFollowUp { get; set; }
-    /// <summary>Concurrency token: incremented once per completed review.</summary>
+    /// <summary>
+    /// Completion of the latest reminder + mini quiz review, always UTC; null before the first one.
+    /// A normal test never changes it.
+    /// </summary>
+    public DateTimeOffset? LastReviewedAt { get; set; }
+    /// <summary>Concurrency token: incremented once per completed review and per demo reset.</summary>
     public int Version { get; set; }
+}
 
-    /// <summary>Memory-model input at <paramref name="now"/>; elapsed time is fractional days.</summary>
-    public TopicMemoryState ToMemoryState(DateTimeOffset now) =>
-        new((now - LastStudiedAt).TotalDays, Strength, InitialRecall, ReviewCount, SuccessRate, NeedsFollowUp);
+public enum TestType
+{
+    /// <summary>A regular unit/topic test taken outside the review feature.</summary>
+    NormalTest,
+    /// <summary>The mini quiz that completes a short reminder review.</summary>
+    ReminderMiniQuiz,
+}
+
+/// <summary>
+/// One completed test with its actual score and sample size: the observations the retention model uses.
+/// Rows are only added, never replaced, so a later mini quiz keeps the earlier normal-test record.
+/// </summary>
+public sealed class TestResult
+{
+    /// <summary>Insertion order; breaks ties between results completed at the same instant.</summary>
+    public long Id { get; init; }
+    public required string StudentId { get; init; }
+    public required string TopicId { get; init; }
+    public TestType TestType { get; init; }
+    /// <summary>UTC time the test was completed.</summary>
+    public DateTimeOffset CompletedAt { get; init; }
+    public int CorrectCount { get; init; }
+    public int TotalQuestions { get; init; }
+    /// <summary>The review session a mini quiz result came from; unique, so a review is recorded once.</summary>
+    public Guid? ReviewSessionId { get; init; }
+
+    public TestObservation ToObservation() => new(CompletedAt, CorrectCount, TotalQuestions);
+
+    /// <summary>
+    /// The latest relevant result by completion time, whatever its type. Equal completion times go to the
+    /// later recorded row; a result submitted later but completed earlier never wins.
+    /// </summary>
+    public static TestResult? Latest(IEnumerable<TestResult> results) =>
+        results.OrderByDescending(result => result.CompletedAt).ThenByDescending(result => result.Id).FirstOrDefault();
 }
 
 public enum ReviewSessionStatus

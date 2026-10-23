@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using DopingRetain.Api.Data;
 using DopingRetain.Api.Memory;
+using DopingRetain.Api.TestResults;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,9 +10,9 @@ namespace DopingRetain.Api.Reviews;
 
 /// <summary>
 /// Starts or resumes the demo student's review sessions, records answers and completes reviews.
-/// Starting and answering never touch StudentTopicState; only completion updates memory.
+/// Starting and answering never write test results or review dates; only completion does.
 /// </summary>
-public sealed class ReviewSessionService(AppDbContext db, TimeProvider clock)
+public sealed class ReviewSessionService(AppDbContext db, TimeProvider clock, RetentionModelOptions options)
 {
     private const string StudentId = SeedData.DemoStudentId;
     private const int SqliteUniqueViolation = 2067; // SQLITE_CONSTRAINT_UNIQUE
@@ -121,9 +122,9 @@ public sealed class ReviewSessionService(AppDbContext db, TimeProvider clock)
     }
 
     /// <summary>
-    /// Completes a fully answered session: scores the stored answers, applies the memory model, and saves
-    /// the updated memory state, the session's completion and its outcome snapshot in one transaction.
-    /// A completed session returns its stored outcome without recalculating anything.
+    /// Completes a fully answered session: stores its actual score as the topic's newest test result, sets the
+    /// topic's review date, and saves the session's completion and outcome snapshot in one transaction.
+    /// A completed session returns its stored outcome without recalculating or storing anything.
     /// </summary>
     public async Task<ServiceResult<ReviewCompletionResponse>> CompleteAsync(
         Guid sessionId, CancellationToken cancellationToken = default)
@@ -163,43 +164,37 @@ public sealed class ReviewSessionService(AppDbContext db, TimeProvider clock)
 
         var now = clock.GetUtcNow();
         var score = session.Answers.Count(answer => answer.IsCorrect);
-        var before = state.ToMemoryState(now);
-        var outcome = MemoryModel.ApplyReviewResult(before, score, questionIds.Count);
-        var updated = outcome.UpdatedState;
+        var testResult = new TestResult
+        {
+            StudentId = StudentId,
+            TopicId = session.TopicId,
+            TestType = TestType.ReminderMiniQuiz,
+            CompletedAt = now,
+            CorrectCount = score,
+            TotalQuestions = questionIds.Count,
+            ReviewSessionId = session.Id,
+        };
+        db.TestResults.Add(testResult);
 
-        // The UPDATE matches only the version read when the session opened, so answers given against
-        // outdated memory state can never overwrite a newer one.
+        // Completed now, so it is the latest result: normal tests cannot be recorded in the future.
+        var after = RetentionModel.Evaluate(testResult.ToObservation(), now, options);
+        var nextReviewAt = after.ReviewAt!.Value;
+
+        // The UPDATE matches only the version read when the session opened, so a session opened before a
+        // reset or another completion can never record a review afterwards.
         db.Entry(state).Property(s => s.Version).OriginalValue = session.StateVersionAtStart;
         state.Version = session.StateVersionAtStart + 1;
-        state.Strength = updated.Strength;
-        state.InitialRecall = updated.InitialRecall;
-        state.LastStudiedAt = now;
-        state.ReviewCount = updated.ReviewCount;
-        state.SuccessRate = updated.SuccessRate;
-        state.NeedsFollowUp = updated.NeedsFollowUp;
+        state.LastReviewedAt = now;
 
         var response = new ReviewCompletionResponse(
             session.Id,
             score,
             questionIds.Count,
-            new CompletedTopicDto(
-                state.TopicId,
-                state.Topic.Title,
-                state.Topic.Category,
-                updated.ElapsedDays,
-                now,
-                updated.SuccessRate,
-                updated.ReviewCount,
-                updated.Strength,
-                updated.InitialRecall,
-                updated.NeedsFollowUp),
-            outcome.Review,
-            outcome.RetentionAtNextReview,
-            outcome.RetentionGain,
-            MemoryModel.GetTopicRisk(before),
-            MemoryModel.GetTopicRisk(updated),
+            new CompletedTopicDto(state.TopicId, state.Topic.Title, state.Topic.Category, now),
             now,
-            now.AddDays(outcome.Review.NextReviewInDays));
+            nextReviewAt,
+            after.Status,
+            TestResultDto.From(testResult));
 
         session.Status = ReviewSessionStatus.Completed;
         session.CompletedAt = response.CompletedAt;

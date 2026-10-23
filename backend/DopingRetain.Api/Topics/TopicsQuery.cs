@@ -1,71 +1,72 @@
 using DopingRetain.Api.Data;
 using DopingRetain.Api.Memory;
+using DopingRetain.Api.TestResults;
 using Microsoft.EntityFrameworkCore;
 
 namespace DopingRetain.Api.Topics;
 
+/// <param name="DueTopicIds">
+/// Due topics in review priority order: lowest estimated recall first, ties in display order. Topics needing
+/// support or without data are not included.
+/// </param>
 /// <param name="WeeklyReviewedTopicCount">
 /// Distinct topics with a review completed this week (Monday 00:00 Europe/Istanbul) up to EvaluatedAt.
 /// </param>
 public sealed record TopicsResponse(
     IReadOnlyList<TopicSummaryDto> Topics,
-    string? HighestRiskTopicId,
-    int HighRiskCount,
+    IReadOnlyList<string> DueTopicIds,
     int WeeklyReviewedTopicCount,
     DateTimeOffset EvaluatedAt);
 
+/// <param name="LatestTest">The latest relevant completed test (normal test or mini quiz); null without data.</param>
+/// <param name="NextReviewAt">When recall reaches the review threshold; the test's completion for support_needed.</param>
+/// <param name="LastReviewedAt">Completion of the latest reminder + mini quiz review; normal tests never set it.</param>
 public sealed record TopicSummaryDto(
     string Id,
     string Title,
     string Category,
-    int Retention,
-    RiskLevel RiskLevel,
-    bool IsFollowUp,
-    bool NeedsInitialReinforcement,
-    DateTimeOffset LastStudiedAt,
-    int ReviewCount,
-    double SuccessRate);
+    ReviewStatus ReviewStatus,
+    TestResultDto? LatestTest,
+    DateTimeOffset? NextReviewAt,
+    DateTimeOffset? LastReviewedAt);
 
 /// <summary>
 /// One topic with its micro-review content. Questions are only counted here; their text comes with a
 /// review session, and correct answers or explanations only as feedback after an answer.
-/// InitialTestAccuracy is the first-test accuracy (R0 as a percentage), set only while the topic needs
-/// initial reinforcement; it is a test score, not a measured recall.
 /// </summary>
 public sealed record TopicDetailResponse(
     string Id,
     string Title,
     string Category,
-    int Retention,
-    RiskLevel RiskLevel,
-    bool IsFollowUp,
-    bool NeedsInitialReinforcement,
-    DateTimeOffset LastStudiedAt,
-    int ReviewCount,
-    double SuccessRate,
+    ReviewStatus ReviewStatus,
+    TestResultDto? LatestTest,
+    DateTimeOffset? NextReviewAt,
+    DateTimeOffset? LastReviewedAt,
     int QuestionCount,
-    int? InitialTestAccuracy,
     IReadOnlyList<SummaryPoint> SummaryPoints,
     DateTimeOffset EvaluatedAt);
 
 public static class TopicsQuery
 {
-    private sealed record EvaluatedTopic(TopicSummaryDto Summary, TopicMemoryState Memory);
+    private sealed record EvaluatedTopic(TopicSummaryDto Summary, RetentionEstimate Estimate);
 
     /// <summary>The student's week starts on Monday 00:00 in this time zone, not in UTC.</summary>
     private static readonly TimeZoneInfo WeekTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul");
 
     /// <summary>Evaluates every topic of a student at one instant, in topic display order.</summary>
     public static async Task<TopicsResponse> GetTopicsAsync(
-        AppDbContext db, string studentId, DateTimeOffset now, CancellationToken cancellationToken = default)
+        AppDbContext db, string studentId, DateTimeOffset now, RetentionModelOptions options,
+        CancellationToken cancellationToken = default)
     {
-        var evaluated = await EvaluateAsync(
-            db.StudentTopicStates.Where(state => state.StudentId == studentId), now, cancellationToken);
-
+        var evaluated = await EvaluateAsync(db, studentId, topicId: null, now, options, cancellationToken);
         return new TopicsResponse(
             evaluated.Select(item => item.Summary).ToList(),
-            MemoryModel.FindHighestRiskTopic(evaluated, item => item.Memory)?.Summary.Id,
-            MemoryModel.CountHighRiskTopics(evaluated.Select(item => item.Memory)),
+            // OrderBy is stable: equal recall keeps topic display order.
+            evaluated
+                .Where(item => item.Estimate.Status == ReviewStatus.Due)
+                .OrderBy(item => item.Estimate.Recall)
+                .Select(item => item.Summary.Id)
+                .ToList(),
             await CountWeeklyReviewedTopicsAsync(db, studentId, now, cancellationToken),
             now);
     }
@@ -110,11 +111,11 @@ public static class TopicsQuery
 
     /// <summary>One topic of a student evaluated at <paramref name="now"/>, or null when it does not exist.</summary>
     public static async Task<TopicDetailResponse?> GetTopicAsync(
-        AppDbContext db, string studentId, string topicId, DateTimeOffset now, CancellationToken cancellationToken = default)
+        AppDbContext db, string studentId, string topicId, DateTimeOffset now, RetentionModelOptions options,
+        CancellationToken cancellationToken = default)
     {
-        var evaluated = await EvaluateAsync(
-            db.StudentTopicStates.Where(state => state.StudentId == studentId && state.TopicId == topicId), now, cancellationToken);
-        if (evaluated is not [{ Summary: var summary, Memory: var memory }]) return null;
+        var evaluated = await EvaluateAsync(db, studentId, topicId, now, options, cancellationToken);
+        if (evaluated is not [{ Summary: var summary }]) return null;
 
         var questionCount = await db.QuizQuestions.CountAsync(question => question.TopicId == topicId, cancellationToken);
 
@@ -122,47 +123,50 @@ public static class TopicsQuery
             summary.Id,
             summary.Title,
             summary.Category,
-            summary.Retention,
-            summary.RiskLevel,
-            summary.IsFollowUp,
-            summary.NeedsInitialReinforcement,
-            summary.LastStudiedAt,
-            summary.ReviewCount,
-            summary.SuccessRate,
+            summary.ReviewStatus,
+            summary.LatestTest,
+            summary.NextReviewAt,
+            summary.LastReviewedAt,
             questionCount,
-            summary.NeedsInitialReinforcement ? MemoryModel.ToDisplayPercentage(memory.InitialRecall) : null,
             SeedData.GetSummaryPoints(topicId),
             now);
     }
 
+    /// <summary>Evaluates the student's topics (or one topic) from each topic's latest relevant test result.</summary>
     private static async Task<List<EvaluatedTopic>> EvaluateAsync(
-        IQueryable<StudentTopicState> states, DateTimeOffset now, CancellationToken cancellationToken)
+        AppDbContext db, string studentId, string? topicId, DateTimeOffset now, RetentionModelOptions options,
+        CancellationToken cancellationToken)
     {
-        var rows = await states
+        var rows = await db.StudentTopicStates
             .AsNoTracking()
+            .Where(state => state.StudentId == studentId && (topicId == null || state.TopicId == topicId))
             .OrderBy(state => state.Topic.SortOrder)
             .ThenBy(state => state.TopicId)
-            .Select(state => new { State = state, state.Topic.Title, state.Topic.Category })
+            .Select(state => new { state.TopicId, state.Topic.Title, state.Topic.Category, state.LastReviewedAt })
             .ToListAsync(cancellationToken);
+
+        // SQLite cannot order by DateTimeOffset, so the latest result per topic is picked in memory.
+        var latestByTopic = (await db.TestResults
+                .AsNoTracking()
+                .Where(result => result.StudentId == studentId && (topicId == null || result.TopicId == topicId))
+                .ToListAsync(cancellationToken))
+            .GroupBy(result => result.TopicId)
+            .ToDictionary(group => group.Key, group => TestResult.Latest(group)!);
 
         return rows
             .Select(row =>
             {
-                var state = row.State;
-                var memory = state.ToMemoryState(now);
-                var risk = MemoryModel.GetTopicRisk(memory);
+                var latest = latestByTopic.GetValueOrDefault(row.TopicId);
+                var estimate = RetentionModel.Evaluate(latest?.ToObservation(), now, options);
                 var summary = new TopicSummaryDto(
-                    state.TopicId,
+                    row.TopicId,
                     row.Title,
                     row.Category,
-                    risk.Retention,
-                    risk.RiskLevel,
-                    risk.IsFollowUp,
-                    risk.NeedsInitialReinforcement,
-                    state.LastStudiedAt,
-                    state.ReviewCount,
-                    state.SuccessRate);
-                return new EvaluatedTopic(summary, memory);
+                    estimate.Status,
+                    latest is null ? null : TestResultDto.From(latest),
+                    estimate.ReviewAt,
+                    row.LastReviewedAt);
+                return new EvaluatedTopic(summary, estimate);
             })
             .ToList();
     }

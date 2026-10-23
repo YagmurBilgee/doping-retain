@@ -1,4 +1,5 @@
 using DopingRetain.Api.Memory;
+using DopingRetain.Api.TestResults;
 
 namespace DopingRetain.Api.Reviews;
 
@@ -23,36 +24,20 @@ public sealed record AnswerFeedbackDto(
     int CorrectIndex,
     string? Explanation);
 
-/// <summary>
-/// Completion result. The first fields match the frontend ReviewOutcome (updatedTopic, review,
-/// retentionAtNextReview, retentionGain); the rest are API additions. RiskBefore and RiskAfter are evaluated
-/// at the completion instant, so RiskAfter.Retention - RiskBefore.Retention equals RetentionGain.
-/// </summary>
+/// <summary>Completion result: the quiz's stored score and the retention model's recommendation from it.</summary>
+/// <param name="NextReviewAt">Where this quiz's curve reaches the threshold; CompletedAt when support is needed now.</param>
 public sealed record ReviewCompletionResponse(
     Guid SessionId,
     int Score,
     int Total,
     CompletedTopicDto UpdatedTopic,
-    ReviewResult Review,
-    int RetentionAtNextReview,
-    int RetentionGain,
-    TopicRisk RiskBefore,
-    TopicRisk RiskAfter,
     DateTimeOffset CompletedAt,
-    DateTimeOffset NextReviewAt);
+    DateTimeOffset NextReviewAt,
+    ReviewStatus ReviewStatus,
+    TestResultDto TestResult);
 
-/// <summary>The reviewed topic in the frontend Topic shape (memory fields only, no quiz content).</summary>
-public sealed record CompletedTopicDto(
-    string Id,
-    string Title,
-    string Category,
-    double LastStudiedDaysAgo,
-    DateTimeOffset LastStudiedAt,
-    double PreviousSuccessRate,
-    int ReviewCount,
-    double CurrentStrength,
-    double InitialRecall,
-    bool NeedsFollowUp);
+/// <summary>The reviewed topic after completion.</summary>
+public sealed record CompletedTopicDto(string Id, string Title, string Category, DateTimeOffset LastReviewedAt);
 
 public sealed record ApiError(string Code, string Message);
 

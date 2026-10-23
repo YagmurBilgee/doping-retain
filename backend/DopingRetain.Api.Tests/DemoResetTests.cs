@@ -37,13 +37,15 @@ public sealed class DemoResetTests : IDisposable
 
         Assert.Equal(FreshSeedMemory(ResetAt), ReadMemory(_database));
         using var db = _database.CreateContext();
-        var topics = await TopicsQuery.GetTopicsAsync(db, SeedData.DemoStudentId, ResetAt);
-        Assert.Equal(new[] { 46, 55, 86, 51 }, topics.Topics.Select(topic => topic.Retention));
+        var topics = await TopicsQuery.GetTopicsAsync(db, SeedData.DemoStudentId, ResetAt, TestOptions.Default);
+        Assert.Equal(new[] { "18/20", "16/20", "19/20", "11/15", "22/25" },
+            topics.Topics.Select(topic => $"{topic.LatestTest!.CorrectCount}/{topic.LatestTest.TotalQuestions}"));
         Assert.Equal(
-            new[] { RiskLevel.HighRisk, RiskLevel.ReviewSoon, RiskLevel.Safe, RiskLevel.ReviewSoon },
-            topics.Topics.Select(topic => topic.RiskLevel));
-        Assert.Equal(ResetAt.AddDays(-11), topics.Topics[0].LastStudiedAt);
-        Assert.Equal(Trigonometry, topics.HighestRiskTopicId);
+            new[] { ReviewStatus.Due, ReviewStatus.Due, ReviewStatus.Scheduled, ReviewStatus.Due, ReviewStatus.Scheduled },
+            topics.Topics.Select(topic => topic.ReviewStatus));
+        Assert.All(topics.Topics, topic => Assert.Null(topic.LastReviewedAt));
+        Assert.Equal(new[] { Trigonometry, "tyt-bio-hucre-bolunmeleri", "tyt-fiz-hareket-ve-kuvvet" }, topics.DueTopicIds);
+        Assert.Equal(0, topics.WeeklyReviewedTopicCount);
         // Completion and reset each advanced the version once.
         Assert.Equal(2, db.StudentTopicStates.Single(s => s.TopicId == Trigonometry).Version);
     }
@@ -58,7 +60,8 @@ public sealed class DemoResetTests : IDisposable
 
         using var db = _database.CreateContext();
         Assert.Equal((0, 0), (db.ReviewSessions.Count(), db.SessionAnswers.Count()));
-        Assert.Equal((1, 4, 3, 4), (db.Students.Count(), db.Topics.Count(), db.QuizQuestions.Count(), db.StudentTopicStates.Count()));
+        Assert.Equal(5, db.TestResults.Count(result => result.TestType == TestType.NormalTest));
+        Assert.Equal((1, 6, 18, 5), (db.Students.Count(), db.Topics.Count(), db.QuizQuestions.Count(), db.StudentTopicStates.Count()));
         Assert.Equal(new[] { "1/2", "√3/2", "0", "1" }, db.QuizQuestions.Single(q => q.Id == "trig-q1").Options);
     }
 
@@ -154,7 +157,7 @@ public sealed class DemoResetTests : IDisposable
         var interceptor = new BeforeFirstInsert(() => Reset(ResetAt));
 
         using var db = _database.CreateContext(interceptor);
-        var result = await new ReviewSessionService(db, ClockAt(SeededAt))
+        var result = await new ReviewSessionService(db, ClockAt(SeededAt), TestOptions.Default)
             .SubmitAnswerAsync(sessionId, new SubmitAnswerRequest("trig-q3", 1));
 
         Assert.True(interceptor.Ran);
@@ -198,21 +201,21 @@ public sealed class DemoResetTests : IDisposable
     private async Task<ServiceResult<ReviewSessionResponse>> Start(TemporaryDatabase? database = null)
     {
         using var db = (database ?? _database).CreateContext();
-        return await new ReviewSessionService(db, ClockAt(SeededAt)).StartOrResumeAsync(Trigonometry);
+        return await new ReviewSessionService(db, ClockAt(SeededAt), TestOptions.Default).StartOrResumeAsync(Trigonometry);
     }
 
     private async Task<ServiceResult<AnswerFeedbackDto>> Answer(
         Guid sessionId, string questionId, int selectedIndex, TemporaryDatabase? database = null)
     {
         using var db = (database ?? _database).CreateContext();
-        return await new ReviewSessionService(db, ClockAt(SeededAt))
+        return await new ReviewSessionService(db, ClockAt(SeededAt), TestOptions.Default)
             .SubmitAnswerAsync(sessionId, new SubmitAnswerRequest(questionId, selectedIndex));
     }
 
     private async Task<ServiceResult<ReviewCompletionResponse>> Complete(Guid sessionId, TemporaryDatabase? database = null)
     {
         using var db = (database ?? _database).CreateContext();
-        return await new ReviewSessionService(db, ClockAt(SeededAt)).CompleteAsync(sessionId);
+        return await new ReviewSessionService(db, ClockAt(SeededAt), TestOptions.Default).CompleteAsync(sessionId);
     }
 
     private async Task Reset(DateTimeOffset at, TemporaryDatabase? database = null)
@@ -241,17 +244,25 @@ public sealed class DemoResetTests : IDisposable
         return ReadMemory(fresh);
     }
 
-    /// <summary>Learning values of every topic state; Version is a concurrency token, not a learning value.</summary>
+    /// <summary>
+    /// Learning values: review dates and test results. Version is a concurrency token and result Ids are
+    /// insertion order, so neither is a learning value.
+    /// </summary>
     private static List<string> ReadMemory(TemporaryDatabase database)
     {
         using var db = database.CreateContext();
-        return db.StudentTopicStates
+        var states = db.StudentTopicStates
             .AsNoTracking()
             .AsEnumerable()
             .OrderBy(state => state.TopicId)
-            .Select(state => $"{state.StudentId}|{state.TopicId}|{state.Strength}|{state.InitialRecall}|{state.LastStudiedAt:O}|" +
-                $"{state.ReviewCount}|{state.SuccessRate}|{state.NeedsFollowUp}")
-            .ToList();
+            .Select(state => $"{state.StudentId}|{state.TopicId}|{state.LastReviewedAt:O}");
+        var results = db.TestResults
+            .AsNoTracking()
+            .AsEnumerable()
+            .OrderBy(result => result.TopicId).ThenBy(result => result.CompletedAt)
+            .Select(result => $"{result.StudentId}|{result.TopicId}|{result.TestType}|{result.CompletedAt:O}|" +
+                $"{result.CorrectCount}/{result.TotalQuestions}|{result.ReviewSessionId}");
+        return states.Concat(results).ToList();
     }
 
     private static TimeProvider ClockAt(DateTimeOffset instant) => DemoClock.Create(instant.ToString("O"), isDevelopment: true);

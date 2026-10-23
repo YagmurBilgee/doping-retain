@@ -1,16 +1,16 @@
 /*
- * Official Doping Hafıza logo (public/doping-hafiza-logo.png, 400×222).
- * The artwork occupies a centered 400×78 band of the transparent canvas,
- * so object-cover with that aspect ratio crops the empty margins.
+ * Official Doping Hafıza logo (public/images/doping-logo.svg, 224×52).
+ * The 400×78 box keeps the sidebar's existing footprint; object-contain
+ * fits the logo inside it without distortion.
  */
 function Logo() {
   return (
     <img
-      src="/doping-hafiza-logo.png"
+      src="/images/doping-logo.svg"
       alt="Doping Hafıza"
       width={400}
       height={78}
-      className="aspect-[400/78] w-full object-cover"
+      className="aspect-[400/78] w-full object-contain object-left"
     />
   )
 }

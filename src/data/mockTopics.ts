@@ -17,11 +17,6 @@ export const featuredTopic: Topic = {
   previousSuccessRate: 0.72,
   reviewCount: 1,
   currentStrength: 14,
-  summaryPoints: [
-    { icon: '📌', tag: 'Temel Özdeşlik', text: 'sin²x + cos²x = 1', note: 'Kareler toplamı daima 1’dir.' },
-    { icon: '💡', tag: 'Oran Kuralı', text: 'tan x = sin x / cos x' },
-    { icon: '⚡', tag: 'Sık Karıştırılan', text: 'sin 30° = cos 60° = 1/2' },
-  ],
   quiz: [
     {
       id: 'trig-q1',

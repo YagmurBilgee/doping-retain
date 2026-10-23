@@ -41,7 +41,7 @@ interface SidebarProps {
 
 function Sidebar({ activeLabel = 'Ana Sayfa' }: SidebarProps) {
   return (
-    <aside className="sticky top-0 hidden h-screen w-[260px] shrink-0 flex-col gap-6 overflow-y-auto border-r border-line bg-surface px-3 py-5 lg:flex">
+    <aside className="sticky top-7 hidden h-[calc(100vh-1.75rem)] w-[300px] shrink-0 flex-col gap-6 overflow-y-auto bg-surface px-3 py-5 lg:flex">
       <div className="px-2">
         <Logo />
       </div>

@@ -16,6 +16,12 @@ import type { ReviewOutcome, ReviewResult, ReviewTier, RiskLevel, Topic, TopicRi
 export const SAFE_THRESHOLD = 70
 export const HIGH_RISK_THRESHOLD = 50
 
+/**
+ * Product rule: a topic with no completed micro-review whose R0 (its first-test accuracy) is below
+ * this value needs initial reinforcement. Its low retention reflects low initial mastery, not forgetting.
+ */
+export const INITIAL_REINFORCEMENT_RECALL = 0.7
+
 interface ReviewRule {
   strengthMultiplier: number
   nextReviewInDays: number
@@ -29,20 +35,34 @@ const REVIEW_RULES: Record<ReviewTier, ReviewRule> = {
   weak: { strengthMultiplier: 1.05, nextReviewInDays: 2, postReviewRecall: 0.58 },
 }
 
-/** Returns retention as an integer percentage (0–100). */
-export function calculateRetention(daysAgo: number, strength: number, initialRecall = 1): number {
+/** Unrounded retention percentage (0–100); every business decision uses this value. */
+function calculateRawRetention(daysAgo: number, strength: number, initialRecall = 1): number {
   if (strength <= 0) return 0
 
   const t = Math.max(0, daysAgo)
   const retention = initialRecall * Math.exp(-t / strength) * 100
 
-  return Math.min(100, Math.max(0, Math.round(retention)))
+  return Math.min(100, Math.max(0, retention))
 }
 
+/** Returns retention as an integer percentage (0–100), for display only. */
+export function calculateRetention(daysAgo: number, strength: number, initialRecall = 1): number {
+  return Math.round(calculateRawRetention(daysAgo, strength, initialRecall))
+}
+
+function getRawTopicRetention(topic: Topic): number {
+  return calculateRawRetention(topic.lastStudiedDaysAgo, topic.currentStrength, topic.initialRecall)
+}
+
+/** Classifies an unrounded retention percentage; pass raw values, not display values. */
 export function getRiskLevel(retentionPercentage: number): RiskLevel {
   if (retentionPercentage >= SAFE_THRESHOLD) return 'safe'
   if (retentionPercentage >= HIGH_RISK_THRESHOLD) return 'review_soon'
   return 'high_risk'
+}
+
+function needsInitialReinforcement(topic: Topic): boolean {
+  return topic.reviewCount === 0 && (topic.initialRecall ?? 1) < INITIAL_REINFORCEMENT_RECALL
 }
 
 /**
@@ -50,13 +70,20 @@ export function getRiskLevel(retentionPercentage: number): RiskLevel {
  * A topic flagged for follow-up (weak last review) is never reported as safe:
  * it is held in review_soon until a stronger review clears the flag, and only
  * falls to high_risk if the curve itself drops that far.
+ * Retention and risk level are unchanged for topics that need initial reinforcement; the flag only
+ * keeps them out of the forgetting signals (highest-risk topic, high-risk count).
  */
 export function getTopicRisk(topic: Topic): TopicRisk {
-  const retention = calculateRetention(topic.lastStudiedDaysAgo, topic.currentStrength, topic.initialRecall)
-  const curveLevel = getRiskLevel(retention)
+  const rawRetention = getRawTopicRetention(topic)
+  const curveLevel = getRiskLevel(rawRetention)
   const isFollowUp = topic.needsFollowUp === true && curveLevel !== 'high_risk'
 
-  return { retention, riskLevel: isFollowUp ? 'review_soon' : curveLevel, isFollowUp }
+  return {
+    retention: Math.round(rawRetention),
+    riskLevel: isFollowUp ? 'review_soon' : curveLevel,
+    isFollowUp,
+    needsInitialReinforcement: needsInitialReinforcement(topic),
+  }
 }
 
 /**
@@ -93,9 +120,8 @@ export function applyReviewResult(topic: Topic, quizScore: number, totalQuestion
   const previousSuccessRate =
     Math.round(((topic.previousSuccessRate * topic.reviewCount + ratio) / reviewCount) * 100) / 100
 
-  const retentionBefore = getTopicRisk(topic).retention
   // A review never leaves the student worse off than before it.
-  const initialRecall = Math.max(REVIEW_RULES[review.tier].postReviewRecall, retentionBefore / 100)
+  const initialRecall = Math.max(REVIEW_RULES[review.tier].postReviewRecall, getRawTopicRetention(topic) / 100)
 
   const updatedTopic: Topic = {
     ...topic,
@@ -111,20 +137,25 @@ export function applyReviewResult(topic: Topic, quizScore: number, totalQuestion
     updatedTopic,
     review,
     retentionAtNextReview: calculateRetention(review.nextReviewInDays, review.newStrength, initialRecall),
-    retentionGain: getTopicRisk(updatedTopic).retention - retentionBefore,
+    retentionGain: getTopicRisk(updatedTopic).retention - getTopicRisk(topic).retention,
   }
 }
 
-/** The high_risk topic with the lowest retention, i.e. the one to surface first. */
+/** A high_risk topic that is being forgotten; topics needing initial reinforcement are not. */
+function isForgettingHighRisk(risk: TopicRisk): boolean {
+  return risk.riskLevel === 'high_risk' && !risk.needsInitialReinforcement
+}
+
+/** The forgetting high_risk topic with the lowest retention, i.e. the one to surface first. */
 export function findHighestRiskTopic(topics: Topic[]): Topic | undefined {
   return topics
-    .map((topic) => ({ topic, ...getTopicRisk(topic) }))
-    .filter(({ riskLevel }) => riskLevel === 'high_risk')
-    .sort((a, b) => a.retention - b.retention)[0]?.topic
+    .map((topic) => ({ topic, risk: getTopicRisk(topic), rawRetention: getRawTopicRetention(topic) }))
+    .filter(({ risk }) => isForgettingHighRisk(risk))
+    .sort((a, b) => a.rawRetention - b.rawRetention)[0]?.topic
 }
 
 export function countHighRiskTopics(topics: Topic[]): number {
-  return topics.filter((topic) => getTopicRisk(topic).riskLevel === 'high_risk').length
+  return topics.filter((topic) => isForgettingHighRisk(getTopicRisk(topic))).length
 }
 
 function getScoreRatio(quizScore: number, totalQuestions: number): number {

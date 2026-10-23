@@ -1,39 +1,51 @@
 import { ArrowRight, CalendarCheck, Clock, PartyPopper, TrendingUp, type LucideIcon } from 'lucide-react'
-import type { ReviewOutcome, ReviewTier, RiskLevel, Topic } from '../types'
-import { getTopicRisk } from '../utils/memoryModel'
+import type { ReviewCompletion } from '../api/types'
+import type { ReviewTier, RiskLevel } from '../types'
 import { getRiskPresentation, type RiskPresentation } from './riskPresentation'
 
 interface QuizResultViewProps {
-  /** Topic as it was before the review */
-  topic: Topic
-  score: number
-  total: number
-  outcome: ReviewOutcome
+  /** Outcome stored by the server; nothing here is recalculated */
+  outcome: ReviewCompletion
   onFinish: () => void
 }
 
-const TIER_COPY: Record<ReviewTier, { icon: LucideIcon; badge: string; tile: string; headline: string; message: string }> = {
+interface TierCopy {
+  icon: LucideIcon
+  badge: string
+  tile: string
+  headline: string
+  /** Built from the server's review interval, never from a hardcoded day count */
+  message: (nextReviewInDays: number) => string
+}
+
+const TIER_COPY: Record<ReviewTier, TierCopy> = {
   perfect: {
     icon: PartyPopper,
     badge: 'badge-success',
     tile: 'bg-success-soft text-success',
     headline: 'Tebrikler! Konuyu Hafızana Sabitledin',
-    message: 'Tüm soruları doğru yanıtladın. Bu konu artık çok daha kalıcı.',
+    message: () => 'Tüm soruları doğru yanıtladın. Bu konu artık çok daha kalıcı.',
   },
   partial: {
     icon: TrendingUp,
     badge: 'badge-brand',
     tile: 'bg-brand-soft text-brand',
     headline: 'Harika İlerleme! Konu Güçlendi',
-    message: 'Küçük bir eksik kaldı. Bir hafta sonra kısa bir tekrarla tamamlayacağız.',
+    message: (days) => `Küçük bir eksik kaldı. ${days} gün sonra kısa bir tekrarla tamamlayacağız.`,
   },
   weak: {
     icon: Clock,
     badge: 'badge-risk',
     tile: 'bg-risk-soft text-risk-ink',
     headline: 'İyi Başlangıç! Konuyu Takibe Aldık',
-    message: 'Bu konu biraz daha ilgi istiyor. İki gün sonra yeniden hatırlatacağız.',
+    message: (days) => `Bu konu biraz daha ilgi istiyor. ${days} gün sonra yeniden hatırlatacağız.`,
   },
+}
+
+const FIRST_REINFORCEMENT_PERFECT: TierCopy = {
+  ...TIER_COPY.perfect,
+  headline: 'Güzel! Konu Güçlendi',
+  message: () => 'Tüm soruları doğru yanıtladın. Konuyu sonraki tekrarlarla pekiştirmeye devam edeceğiz.',
 }
 
 interface PersistenceLabel {
@@ -55,12 +67,11 @@ const PERSISTENCE_AFTER: Record<ReviewTier, PersistenceLabel> = {
   weak: { text: 'Kalıcılık: Takip Ediliyor', tone: 'font-semibold text-risk-ink', icon: Clock },
 }
 
-function QuizResultView({ topic, score, total, outcome, onFinish }: QuizResultViewProps) {
-  const before = getTopicRisk(topic)
-  const after = getTopicRisk(outcome.updatedTopic)
+function QuizResultView({ outcome, onFinish }: QuizResultViewProps) {
+  const { score, total, review, retentionAtNextReview, retentionGain, riskBefore: before, riskAfter: after } = outcome
   const afterPresentation = getRiskPresentation(after)
-  const { review, retentionAtNextReview, retentionGain } = outcome
-  const copy = TIER_COPY[review.tier]
+  // A first review of a topic that needed initial reinforcement never claims the topic is mastered.
+  const copy = before.needsInitialReinforcement && review.tier === 'perfect' ? FIRST_REINFORCEMENT_PERFECT : TIER_COPY[review.tier]
   const TierIcon = copy.icon
 
   return (
@@ -75,7 +86,7 @@ function QuizResultView({ topic, score, total, outcome, onFinish }: QuizResultVi
         <h2 id="mini-quiz-title" className="mt-2 text-xl font-bold tracking-tight text-ink">
           {copy.headline}
         </h2>
-        <p className="mt-1 text-sm text-ink-secondary">{copy.message}</p>
+        <p className="mt-1 text-sm text-ink-secondary">{copy.message(review.nextReviewInDays)}</p>
       </header>
 
       <section

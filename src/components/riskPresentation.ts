@@ -20,6 +20,10 @@ export const RISK_PRESENTATION: Record<RiskLevel, RiskPresentation> = {
 /** Weak last review: same amber treatment as review_soon, labelled as being watched. */
 const FOLLOW_UP_PRESENTATION: RiskPresentation = { ...RISK_PRESENTATION.review_soon, label: 'Takipte' }
 
+/** Low initial mastery, not forgetting: amber like follow-up, never the danger treatment. */
+const INITIAL_REINFORCEMENT_PRESENTATION: RiskPresentation = { ...RISK_PRESENTATION.review_soon, label: 'Pekiştirme Gerekli' }
+
 export function getRiskPresentation(risk: TopicRisk): RiskPresentation {
+  if (risk.needsInitialReinforcement) return INITIAL_REINFORCEMENT_PRESENTATION
   return risk.isFollowUp ? FOLLOW_UP_PRESENTATION : RISK_PRESENTATION[risk.riskLevel]
 }

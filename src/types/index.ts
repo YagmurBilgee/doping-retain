@@ -9,7 +9,7 @@ export interface QuizQuestion {
   explanation?: string
 }
 
-/** A recall bullet in the micro-review, tagged with a Doping-style memory hint */
+/** A recall bullet in the micro-review, tagged with a Doping-style memory hint (served by GET /api/topics/{id}) */
 export interface SummaryPoint {
   /** Short emoji marker, e.g. 📌 */
   icon: string
@@ -33,8 +33,6 @@ export interface Topic {
   currentStrength: number
   /** Initial recall R0 (0–1) right after the last study session; defaults to 1 */
   initialRecall?: number
-  /** Key recall points shown before the micro-review quiz */
-  summaryPoints?: SummaryPoint[]
   /** Mini-quiz for the micro-review flow */
   quiz?: QuizQuestion[]
   /** Set after a weak review: keeps the topic out of the safe band until reviewed again */
@@ -47,6 +45,8 @@ export interface TopicRisk {
   riskLevel: RiskLevel
   /** True when a weak last review holds the topic in review_soon ("Takipte") */
   isFollowUp: boolean
+  /** No completed micro-review and a first-test R0 below 0.70: low initial mastery, not forgetting ("Pekiştirme Gerekli") */
+  needsInitialReinforcement: boolean
 }
 
 /** Score band of a micro-review: 3/3, at least 2/3, or below */

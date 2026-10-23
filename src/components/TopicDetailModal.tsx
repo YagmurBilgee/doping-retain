@@ -58,7 +58,7 @@ function TopicDetailModal({ topicId, onClose, onSessionStarted, reviewMinutes = 
   }
 
   return (
-    <ModalShell isOpen onClose={onClose} labelledBy="topic-detail-title">
+    <ModalShell isOpen size="wide" onClose={onClose} labelledBy="topic-detail-title">
       {detail.status === 'ready' ? (
         <TopicDetailContent
           topic={detail.data}

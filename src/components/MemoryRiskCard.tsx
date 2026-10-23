@@ -1,4 +1,4 @@
-import { BrainCircuit, Clock, RotateCcw, ShieldCheck, Triangle } from 'lucide-react'
+import { BrainCircuit, CalendarCheck, Clock, RotateCcw, ShieldCheck, Triangle } from 'lucide-react'
 import { daysSinceStudied, type LoadState, type ReviewCompletion, type TopicsResponse, type TopicSummary } from '../api/types'
 import { getRiskPresentation } from './riskPresentation'
 
@@ -23,7 +23,7 @@ function MemoryRiskCard({ topics, onRetry, lastReview, reviewMinutes = 5, onStar
       <header className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h2 id="memory-risk-title" className="section-title">
-            Unutmak Üzeresin
+            Dopingle Hatırla
           </h2>
           <p className="section-subtitle mt-0.5">
             {data ? `${data.highRiskCount} konu yüksek risk altında` : 'Hafıza durumun'}
@@ -69,7 +69,20 @@ function MemoryRiskCard({ topics, onRetry, lastReview, reviewMinutes = 5, onStar
       )}
 
       {reinforcementTopics.length > 0 && <ReinforcementTopics topics={reinforcementTopics} onOpenTopic={onStartReview} />}
+
+      {/* Only from a loaded response, so loading or errors never show a made-up zero. */}
+      {data && <WeeklyReviews count={data.weeklyReviewedTopicCount} />}
     </section>
+  )
+}
+
+/** Secondary footer with the server's weekly count of distinct reviewed topics. */
+function WeeklyReviews({ count }: { count: number }) {
+  return (
+    <p className="mt-4 flex items-center gap-1.5 border-t border-line pt-3 text-xs text-ink-muted">
+      <CalendarCheck size={14} className="shrink-0" aria-hidden="true" />
+      {count > 0 ? `Bu hafta ${count} farklı konuyu tekrar ettin.` : 'Bu haftaki ilk tekrarını yapmaya hazır mısın?'}
+    </p>
   )
 }
 

@@ -22,6 +22,8 @@ export interface TopicsResponse {
   topics: TopicSummary[]
   highestRiskTopicId: string | null
   highRiskCount: number
+  /** Distinct topics with a review completed this week (Monday 00:00 Europe/Istanbul) up to evaluatedAt */
+  weeklyReviewedTopicCount: number
   /** Instant the backend evaluated every topic at (ISO 8601 UTC) */
   evaluatedAt: string
 }

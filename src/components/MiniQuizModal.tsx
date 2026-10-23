@@ -190,7 +190,7 @@ function MiniQuizModal({ session, topicTitle, onClose, onCompleted }: MiniQuizMo
   const stepKey = state.outcome ? 'result' : state.sessionProblem ? 'problem' : `${sessionId}-${state.index}`
 
   return (
-    <ModalShell isOpen onClose={close} labelledBy="mini-quiz-title">
+    <ModalShell isOpen size="wide" onClose={close} labelledBy="mini-quiz-title">
       {/* Keyed per step so each question and the result fade in on change. */}
       <div key={stepKey} className="motion-safe:animate-fade-in">
         {state.outcome ? (

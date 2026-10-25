@@ -1,4 +1,4 @@
-import { Award, Coins, Flame, PlayCircle, UserRound } from 'lucide-react'
+import { Award, Flame, PlayCircle, Star, Sun } from 'lucide-react'
 
 // Placeholder badges: the real Doping Hafıza badge artwork is not in the repo yet.
 const ACHIEVEMENTS = [
@@ -9,35 +9,42 @@ const ACHIEVEMENTS = [
 
 function ProfileBanner() {
   return (
-    <section className="relative flex flex-1 items-start gap-4 rounded-card bg-neutral-900 p-card text-white shadow-card">
-      <div className="flex shrink-0 flex-col items-center gap-2">
-        <span className="flex size-20 items-center justify-center rounded-tile bg-risk-soft text-risk-ink" aria-hidden="true">
-          <UserRound size={40} />
-        </span>
-        <span className="metric-pill">
-          <Coins size={16} className="text-coin" aria-hidden="true" />
-          615
-        </span>
-      </div>
-
-      <div className="min-w-0 flex-1 pt-1 pr-10">
-        <h1 className="truncate text-2xl font-bold">yagmur akkose</h1>
-        <ul className="mt-2 flex items-center gap-1.5" aria-label="Rozetler">
-          {ACHIEVEMENTS.map(({ label, icon: Icon }) => (
-            <li
-              key={label}
-              title={label}
-              aria-label={label}
-              className="flex size-7 items-center justify-center rounded-full bg-white/10 text-coin"
+    <section className="relative min-h-[193px] min-w-0 flex-1 rounded-tile bg-linear-to-b from-[#303e4f] to-[#1e2b3c] p-[21px] font-manrope text-white shadow-card">
+      <div className="flex gap-4">
+        <div className="flex shrink-0 flex-col items-center gap-1.5">
+          <span className="avatar-surface block size-[102px] overflow-hidden rounded-[12px]">
+            <img src="/images/student-avatar.png" alt="" className="size-full object-contain" />
+          </span>
+          <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-linear-to-b from-white to-[#eceff3] pr-3.5 pl-1 text-base font-extrabold text-[#977a34] shadow-card">
+            <span
+              className="flex size-6 items-center justify-center rounded-full bg-linear-to-b from-[#f8cd52] to-[#e09b1c]"
+              aria-hidden="true"
             >
-              <Icon size={14} aria-hidden="true" />
-            </li>
-          ))}
-        </ul>
+              <Star size={13} fill="#fde68a" stroke="#b9770e" strokeWidth={2} />
+            </span>
+            615
+          </span>
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col pt-2.5 pr-16">
+          <h1 className="truncate text-2xl font-extrabold">Yağmur</h1>
+          <ul className="mt-auto flex items-center gap-2" aria-label="Rozetler">
+            {ACHIEVEMENTS.map(({ label, icon: Icon }) => (
+              <li
+                key={label}
+                title={label}
+                aria-label={label}
+                className="flex size-[35px] items-center justify-center rounded-full bg-white/10 text-coin ring-1 ring-white/30"
+              >
+                <Icon size={17} aria-hidden="true" />
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
 
-      <span className="absolute top-card right-card flex items-center gap-1 text-sm font-semibold">
-        <Flame size={16} className="text-coin" aria-hidden="true" />1
+      <span className="absolute top-[29px] right-[29px] flex items-center gap-2 text-[26px] leading-none font-extrabold text-[#fbe57a]">
+        <Sun size={26} fill="#fcd34d" stroke="#f08a24" strokeWidth={2} aria-hidden="true" />1
       </span>
     </section>
   )

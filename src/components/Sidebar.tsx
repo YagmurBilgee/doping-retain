@@ -1,14 +1,16 @@
+import { useState } from 'react'
 import {
   Activity,
-  Bird,
   BookOpen,
-  Bot,
   ChevronDown,
   CircleHelp,
-  FileCheck2,
+  CirclePlay,
+  FileCheck,
   LayoutGrid,
-  MonitorPlay,
-  Smartphone,
+  Presentation,
+  SquareMousePointer,
+  Tablet,
+  UsersRound,
   Video,
   type LucideIcon,
 } from 'lucide-react'
@@ -16,24 +18,77 @@ import Logo from './Logo'
 
 interface NavItem {
   label: string
-  icon: LucideIcon
-  tile: string
-  hasSubmenu?: boolean
+  /* A white line-art icon, or the path of a full-color logo image. */
+  icon: LucideIcon | string
+  /* Tile gradient (top-left → bottom-right), sampled from the Doping Hafıza web sidebar. */
+  tile: [from: string, to: string]
+  submenu?: string[]
 }
 
-/* Order, labels and tile colors follow the Doping Hafıza Desktop client. */
+/* Order, labels and tile colors follow the Doping Hafıza web sidebar. */
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Ana Sayfa', icon: LayoutGrid, tile: 'bg-nav-blue' },
-  { label: 'Dersler', icon: BookOpen, tile: 'bg-nav-terracotta' },
-  { label: 'Testler ve Denemeler', icon: FileCheck2, tile: 'bg-nav-green' },
-  { label: 'WAY Evreni', icon: Bird, tile: 'bg-nav-sky' },
-  { label: 'Rehberlik Videoları', icon: MonitorPlay, tile: 'bg-nav-video' },
-  { label: 'İstatistikler', icon: Activity, tile: 'bg-nav-amber' },
-  { label: 'Akıllı Değerlendirme Paneli', icon: Bot, tile: 'bg-nav-orchid' },
-  { label: 'Bire Bir Uygulamalar', icon: Smartphone, tile: 'bg-nav-mauve', hasSubmenu: true },
-  { label: 'Yardım Merkezi', icon: CircleHelp, tile: 'bg-nav-teal' },
-  { label: 'Canlı Etkinlikler', icon: Video, tile: 'bg-nav-coral' },
+  { label: 'Dersler', icon: BookOpen, tile: ['#dfa565', '#d09352'] },
+  { label: 'Ana Sayfa', icon: LayoutGrid, tile: ['#8898e8', '#7284d7'] },
+  { label: 'Testler ve Denemeler', icon: FileCheck, tile: ['#6fd192', '#6dc08d'] },
+  { label: 'WAY Evreni', icon: '/images/way-bird.png', tile: ['#c5caf9', '#c5caf9'] },
+  { label: 'Rehberlik Videoları', icon: SquareMousePointer, tile: ['#80c6e2', '#71b5d2'] },
+  { label: 'İstatistikler', icon: Activity, tile: ['#f6d67c', '#edc966'] },
+  { label: 'Akıllı Değerlendirme Paneli', icon: Presentation, tile: ['#5461e7', '#3b4fe1'] },
+  {
+    label: 'Bire Bir Uygulamalar',
+    icon: Tablet,
+    tile: ['#ac4b70', '#7f417e'],
+    submenu: ['Çözücü', 'Şimdi Anladım', 'Koçum Yanımda'],
+  },
+  { label: 'Yardım Merkezi', icon: CircleHelp, tile: ['#57b194', '#4ca189'] },
+  { label: 'Canlı Etkinlikler', icon: Video, tile: ['#d14d4f', '#bb3f44'] },
+  { label: 'YKS Butik', icon: UsersRound, tile: ['#5965f5', '#7e89f2'] },
+  { label: 'Testimonial', icon: CirclePlay, tile: ['#64bdf4', '#5590e9'] },
 ]
+
+function NavTile({ icon: Icon, tile: [from, to] }: NavItem) {
+  return (
+    <span
+      className="sidebar-tile"
+      style={{ backgroundImage: `linear-gradient(135deg, ${from}, ${to})` }}
+      aria-hidden="true"
+    >
+      {typeof Icon === 'string' ? <img src={Icon} alt="" /> : <Icon strokeWidth={2} />}
+    </span>
+  )
+}
+
+function NavGroup({ item }: { item: NavItem & { submenu: string[] } }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const submenuId = 'sidebar-submenu'
+
+  return (
+    <li>
+      <button
+        type="button"
+        className="sidebar-link"
+        aria-expanded={isOpen}
+        aria-controls={submenuId}
+        onClick={() => setIsOpen((open) => !open)}
+      >
+        <NavTile {...item} />
+        <span className="flex min-w-0 items-center">
+          <span className="sidebar-label">{item.label}</span>
+          <ChevronDown className="sidebar-chevron" strokeWidth={2} aria-hidden="true" />
+        </span>
+      </button>
+      <ul id={submenuId} className="sidebar-list" hidden={!isOpen}>
+        {item.submenu.map((label) => (
+          <li key={label}>
+            <a href="#" className="sidebar-link sidebar-sublink">
+              <span className="sidebar-label">{label}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </li>
+  )
+}
 
 interface SidebarProps {
   activeLabel?: string
@@ -41,27 +96,20 @@ interface SidebarProps {
 
 function Sidebar({ activeLabel = 'Ana Sayfa' }: SidebarProps) {
   return (
-    <aside className="sticky top-7 hidden h-[calc(100vh-1.75rem)] w-[300px] shrink-0 flex-col gap-6 overflow-y-auto bg-surface px-3 py-5 lg:flex">
-      <div className="px-2">
-        <Logo />
-      </div>
+    <aside className="sidebar sticky top-0 hidden h-screen shrink-0 overflow-y-auto lg:flex">
+      <Logo className="sidebar-logo" />
 
       <nav aria-label="Ana menü">
-        <ul className="flex flex-col gap-0.5">
-          {NAV_ITEMS.map(({ label, icon: Icon, tile, hasSubmenu }) => {
-            const isActive = label === activeLabel
+        <ul className="sidebar-list">
+          {NAV_ITEMS.map((item) => {
+            if (item.submenu) return <NavGroup key={item.label} item={{ ...item, submenu: item.submenu }} />
+
+            const isActive = item.label === activeLabel
             return (
-              <li key={label}>
-                <a
-                  href="#"
-                  className={`nav-item ${isActive ? 'nav-item-active' : ''}`}
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  <span className={`icon-tile size-7 rounded-lg text-white ${tile}`} aria-hidden="true">
-                    <Icon size={15} strokeWidth={2.25} />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">{label}</span>
-                  {hasSubmenu && <ChevronDown size={14} className="shrink-0 text-ink-secondary" aria-hidden="true" />}
+              <li key={item.label}>
+                <a href="#" className="sidebar-link" aria-current={isActive ? 'page' : undefined}>
+                  <NavTile {...item} />
+                  <span className="sidebar-label">{item.label}</span>
                 </a>
               </li>
             )

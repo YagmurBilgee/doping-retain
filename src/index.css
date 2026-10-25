@@ -7,6 +7,8 @@
  */
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Doping Hafıza web arayüzünün yazı tipi (kenar çubuğu ve panel başlığı) */
+  --font-manrope: "Manrope", var(--font-sans);
 
   /* Zemin ve yüzeyler */
   --color-canvas: #f8f9fb;
@@ -14,12 +16,16 @@
   --color-surface-muted: #f3f5fb;
   --color-line: #e4e7f1;
   /* Arama alanı ve üst çubuk ikon düğmelerinin soluk dolgusu */
-  --color-field: #eef0f4;
+  --color-field: #eef2f4;
 
   /* Metin */
   --color-ink: #1e2340;
   --color-ink-secondary: #5f6584;
   --color-ink-muted: #9aa0b8;
+  /* Arama metni ve koyu profil kartındaki soluk metinler */
+  --color-ink-slate: #657a94;
+  /* Panel başlıkları (Duyurular, Son Aktivitelerim) */
+  --color-heading: #303d4e;
 
   /* Marka */
   --color-brand: #2f55d4;
@@ -38,20 +44,6 @@
   --color-success: #22a06b;
   --color-success-soft: #e3f6ec;
   --color-success-ink: #157a50;
-
-  /* Kenar çubuğu: aktif hap ve menü ikon kareleri (masaüstü uygulamasından) */
-  --color-nav-active: #dce7fd;
-  --color-nav-active-ink: #1e3a8a;
-  --color-nav-blue: #3b6fd8;
-  --color-nav-terracotta: #c8734a;
-  --color-nav-green: #34a36b;
-  --color-nav-sky: #4aa8e0;
-  --color-nav-video: #3a7bd5;
-  --color-nav-amber: #f2a93b;
-  --color-nav-orchid: #c084d8;
-  --color-nav-mauve: #a5679b;
-  --color-nav-teal: #2bb3a6;
-  --color-nav-coral: #ef6b6b;
 
   /* Köşe yarıçapları */
   --radius-card: 1rem;
@@ -166,18 +158,23 @@
   @apply inline-flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-sm font-bold text-ink shadow-card;
 }
 
-/* Kenar çubuğu navigasyonu */
-@utility nav-item {
-  @apply flex items-center gap-2.5 rounded-tile px-2.5 py-2 text-[13px] whitespace-nowrap text-ink transition-colors hover:bg-surface-muted;
-}
-
-@utility nav-item-active {
-  @apply bg-nav-active font-medium text-nav-active-ink hover:bg-nav-active;
-}
-
 /* Arama çubuğu */
 @utility search-field {
-  @apply flex h-12 items-center gap-3 rounded-tile bg-field px-4 text-base text-ink;
+  @apply flex h-13 items-center gap-5 rounded-tile bg-field px-5 font-manrope text-base text-ink;
+}
+
+/* Duyurular ve Son Aktivitelerim: başlık ve beyaz kart */
+@utility panel-title {
+  @apply font-manrope text-[26px] font-bold text-heading;
+}
+
+@utility panel-card {
+  @apply h-[202px] rounded-tile bg-surface font-manrope shadow-card;
+}
+
+/* Avatar zemini (üst çubuk ve profil kartı) */
+@utility avatar-surface {
+  background-image: linear-gradient(180deg, #ffd873 0%, #f2c44d 100%);
 }
 
 /* Butonlar */
@@ -187,4 +184,112 @@
 
 @utility btn-secondary {
   @apply inline-flex items-center justify-center gap-2 rounded-tile bg-brand-soft px-4 py-2 text-sm font-semibold text-brand transition-colors hover:bg-brand-soft/70;
+}
+
+/*
+ * Kenar çubuğu: ölçüler Doping Hafıza web sitesinin hesaplanmış stillerinden alınmıştır.
+ * Değerler sitenin 14px tasarım tabanına göre yazılmıştır; rem değerleri --sidebar-rem ile yerel
+ * piksele çevrilir; uygulamanın kök font boyutu değişmez.
+ */
+@layer components {
+  .sidebar {
+    --sidebar-rem: 14px;
+    flex-direction: column;
+    width: calc(20.71429 * var(--sidebar-rem));
+    padding: calc(2.5 * var(--sidebar-rem)) calc(1.28571 * var(--sidebar-rem)) calc(2.5 * var(--sidebar-rem))
+      calc(0.85714 * var(--sidebar-rem));
+    background-color: #fff;
+    box-shadow: calc(0.28571 * var(--sidebar-rem)) calc(0.28571 * var(--sidebar-rem)) calc(1.14286 * var(--sidebar-rem))
+      rgb(112 144 176 / 0.1);
+    font-family: var(--font-manrope);
+    transition: width 600ms ease;
+  }
+
+  .sidebar-logo {
+    display: block;
+    flex-shrink: 0;
+    width: calc(16 * var(--sidebar-rem));
+    height: calc(3.71429 * var(--sidebar-rem));
+    margin: 0 0 calc(2.85714 * var(--sidebar-rem)) calc(0.71429 * var(--sidebar-rem));
+  }
+
+  .sidebar-list {
+    display: flex;
+    flex-direction: column;
+    gap: calc(0.35714 * var(--sidebar-rem));
+  }
+
+  .sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: calc(1.07143 * var(--sidebar-rem));
+    width: 100%;
+    padding-left: calc(0.71429 * var(--sidebar-rem));
+    border-radius: calc(0.64286 * var(--sidebar-rem));
+    color: #000;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 300ms ease-in-out;
+
+    &:hover,
+    &[aria-current="page"] {
+      background-color: #f3f7f9;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-brand);
+      outline-offset: -2px;
+    }
+  }
+
+  /* Alt menü metni üst menü etiketleriyle aynı hizadan başlar (iç boşluk + ikon karesi + aralık). */
+  .sidebar-sublink {
+    padding-left: calc((0.71429 + 2.14286 + 1.07143) * var(--sidebar-rem));
+  }
+
+  .sidebar-tile {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: calc(2.14286 * var(--sidebar-rem));
+    height: calc(2.14286 * var(--sidebar-rem));
+    border-radius: calc(0.57143 * var(--sidebar-rem));
+    color: #fff;
+
+    & svg {
+      width: calc(1.14286 * var(--sidebar-rem));
+      height: calc(1.14286 * var(--sidebar-rem));
+    }
+
+    /* Renkli logo görseli (WAY kuşu) referanstaki gibi karenin ~%70'ini kaplar. */
+    & img {
+      width: calc(1.5 * var(--sidebar-rem));
+      height: calc(1.5 * var(--sidebar-rem));
+      object-fit: contain;
+    }
+  }
+
+  .sidebar-label {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    padding-block: calc(1.07143 * var(--sidebar-rem));
+    font-size: calc(1.07143 * var(--sidebar-rem));
+    font-weight: 400;
+    line-height: 1;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .sidebar-chevron {
+    flex-shrink: 0;
+    width: calc(1.71429 * var(--sidebar-rem));
+    height: calc(1.71429 * var(--sidebar-rem));
+    transition: transform 300ms ease-in-out;
+
+    [aria-expanded="true"] & {
+      transform: rotate(180deg);
+    }
+  }
 }

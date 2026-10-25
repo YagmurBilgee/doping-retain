@@ -6,7 +6,7 @@
  */
 function JourneyCard() {
   return (
-    <section className="relative aspect-[672/324] rounded-card shadow-card">
+    <section className="relative flex aspect-[672/324] flex-col rounded-card font-manrope shadow-card">
       <img
         src="/images/yks-background.png"
         alt=""
@@ -14,13 +14,16 @@ function JourneyCard() {
         height={324}
         className="absolute inset-0 size-full rounded-card object-cover"
       />
-      <div className="relative rounded-card bg-linear-to-r from-white/85 via-white/60 via-45% to-transparent to-75% p-card">
-        <h2 className="text-lg font-bold text-ink">YKS Yolculuğum!</h2>
-        <p className="mt-1 max-w-[60%] text-sm text-ink-secondary">
+      <div className="relative flex flex-1 flex-col items-start rounded-card bg-linear-to-r from-white/85 via-white/60 via-45% to-transparent to-75% px-3.5 pt-[18px] pb-[22px]">
+        <h2 className="text-2xl leading-tight font-extrabold text-heading">YKS Yolculuğum!</h2>
+        <p className="mt-1.5 max-w-60 text-sm leading-[1.55] text-[#282828]">
           Hedefine ulaşman için sana özel hazırlanmış bir yolculuk.
         </p>
-        <button type="button" className="btn-primary mt-3">
-          Yolculuğa Git
+        <button
+          type="button"
+          className="mt-auto rounded-md bg-heading px-3 py-[5px] text-[15px] font-bold text-white transition-colors hover:bg-heading/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-heading"
+        >
+          Yolculuğu Başlat
         </button>
       </div>
     </section>

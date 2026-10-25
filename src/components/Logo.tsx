@@ -1,16 +1,15 @@
 /*
  * Official Doping Hafıza logo (public/images/doping-logo.svg, 224×52).
- * The 400×78 box keeps the sidebar's existing footprint; object-contain
- * fits the logo inside it without distortion.
+ * The caller sizes the box; object-contain keeps the logo's aspect ratio.
  */
-function Logo() {
+function Logo({ className }: { className?: string }) {
   return (
     <img
       src="/images/doping-logo.svg"
       alt="Doping Hafıza"
-      width={400}
-      height={78}
-      className="aspect-[400/78] w-full object-contain object-left"
+      width={224}
+      height={52}
+      className={`object-contain object-left ${className ?? ''}`}
     />
   )
 }

@@ -7,6 +7,7 @@ import MiniQuizModal from '../components/MiniQuizModal'
 import Sidebar from '../components/Sidebar'
 import TopBar from '../components/TopBar'
 import TopicDetailModal from '../components/TopicDetailModal'
+import Announcements from '../components/home/Announcements'
 import DailyProgram from '../components/home/DailyProgram'
 import DailyTasksCard from '../components/home/DailyTasksCard'
 import JourneyCard from '../components/home/JourneyCard'
@@ -93,17 +94,20 @@ function HomePage() {
     <div className="flex flex-1">
       <Sidebar />
 
-      <div className="flex min-w-0 flex-1 flex-col gap-5 px-4 py-6 sm:px-7 sm:pt-9">
+      <div className="flex min-w-0 flex-1 flex-col gap-[26px] px-4 py-6 sm:px-7 sm:pt-9">
         <TopBar />
 
         <div className="grid gap-7 xl:grid-cols-[minmax(0,1fr)_344px]">
           <main className="flex min-w-0 flex-col gap-6">
-            <div className="flex flex-col gap-4 sm:flex-row">
+            <div className="flex flex-col gap-[11px] sm:flex-row">
               <ProfileBanner />
               <DailyTasksCard />
             </div>
             <PerformanceChart />
-            <RecentActivities />
+            <div className="grid gap-6 md:grid-cols-2">
+              <Announcements />
+              <RecentActivities />
+            </div>
           </main>
 
           <aside className="flex flex-col gap-6" aria-label="Günlük plan">

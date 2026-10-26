@@ -66,6 +66,12 @@ export function formatTestAge(completedAt: string, referenceIso: string): string
 }
 
 /**
+ * Integration boundary: the real app opens the topic's lesson video page in Doping Hafıza. The prototype has
+ * no such route, so every lesson video link only shows this notice.
+ */
+export const LESSON_VIDEO_NOTICE = 'Gerçek uygulamada bu konunun ders videosu sayfası açılacak.'
+
+/**
  * The model's recommendation from the backend status and nextReviewAt; nothing is recalculated here.
  * Null without test data, so no review date is ever invented.
  */

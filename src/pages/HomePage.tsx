@@ -16,11 +16,14 @@ import PerformanceChart from '../components/home/PerformanceChart'
 import ProfileBanner from '../components/home/ProfileBanner'
 import RecentActivities from '../components/home/RecentActivities'
 
+/** Due/no-data topics open the short review; support-needed topics open the reinforcement flow. */
+type ReviewFlow = 'review' | 'reinforcement'
+
 function HomePage() {
   const [topics, setTopics] = useState<LoadState<TopicsResponse>>({ status: 'loading' })
   // Modals remember the reset epoch they opened in; their results are dropped once a reset has started.
-  const [detail, setDetail] = useState<{ topicId: string; epoch: number } | null>(null)
-  const [quiz, setQuiz] = useState<{ session: ReviewSession; topicTitle: string; epoch: number } | null>(null)
+  const [detail, setDetail] = useState<{ topicId: string; flow: ReviewFlow; epoch: number } | null>(null)
+  const [quiz, setQuiz] = useState<{ session: ReviewSession; topicTitle: string; flow: ReviewFlow; epoch: number } | null>(null)
   const [isResetting, setIsResetting] = useState(false)
   const [resetError, setResetError] = useState<string>()
 
@@ -47,12 +50,12 @@ function HomePage() {
     loadTopics()
   }, [loadTopics])
 
-  const openDetail = (topicId: string) => setDetail({ topicId, epoch: resetEpoch.current })
+  const openDetail = (topicId: string, flow: ReviewFlow = 'review') => setDetail({ topicId, flow, epoch: resetEpoch.current })
 
   const handleSessionStarted = (session: ReviewSession, topicTitle: string) => {
     if (!detail || !isCurrentEpoch(detail.epoch)) return
     setDetail(null)
-    setQuiz({ session, topicTitle, epoch: detail.epoch })
+    setQuiz({ session, topicTitle, flow: detail.flow, epoch: detail.epoch })
   }
 
   // Without a confirmed outcome the server may or may not have stored the review: show its state, not a guess.
@@ -113,7 +116,12 @@ function HomePage() {
           <aside className="flex flex-col gap-6" aria-label="Günlük plan">
             <JourneyCard />
             <MiniCalendar />
-            <MemoryRiskCard topics={topics} onRetry={reloadTopics} onStartReview={openDetail} />
+            <MemoryRiskCard
+              topics={topics}
+              onRetry={reloadTopics}
+              onStartReview={(topicId) => openDetail(topicId)}
+              onStartReinforcement={(topicId) => openDetail(topicId, 'reinforcement')}
+            />
             <DailyProgram />
             {import.meta.env.DEV && (
               <DemoResetButton onReset={() => void handleResetDemo()} isResetting={isResetting} error={resetError} />
@@ -124,8 +132,9 @@ function HomePage() {
 
       {detail && (
         <TopicDetailModal
-          key={detail.topicId}
+          key={`${detail.flow}:${detail.topicId}`}
           topicId={detail.topicId}
+          flow={detail.flow}
           onClose={() => setDetail(null)}
           onSessionStarted={handleSessionStarted}
         />
@@ -136,6 +145,7 @@ function HomePage() {
           key={quiz.session.sessionId}
           session={quiz.session}
           topicTitle={quiz.topicTitle}
+          variant={quiz.flow}
           onClose={handleQuizClosed}
           onCompleted={handleReviewCompleted}
         />

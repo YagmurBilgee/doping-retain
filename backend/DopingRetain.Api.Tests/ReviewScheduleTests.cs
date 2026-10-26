@@ -167,6 +167,38 @@ public sealed class ReviewScheduleTests : IDisposable
         Assert.Equal(afterSupport.AddDays(10), restart.NextReviewAt);
     }
 
+    // A reinforcement of a support-needed topic is an ordinary mini quiz session: the support state is always
+    // on time, and the weak score reset the sequence, so the stored score alone decides the recommendation.
+    [Theory]
+    [InlineData(2, ReviewStatus.Scheduled)]
+    [InlineData(1, ReviewStatus.SupportNeeded)]
+    [InlineData(0, ReviewStatus.SupportNeeded)]
+    public async Task ReinforcementAfterSupport_UsesTheScoreBasedRecommendation(int score, ReviewStatus status)
+    {
+        await Review(0, Now);
+        var reinforcementAt = Now.AddHours(1);
+
+        var outcome = await Review(score, reinforcementAt);
+
+        var expected = score == 2 ? reinforcementAt.AddDays(10 * Math.Log2(2.0 / 3 / 0.5)) : reinforcementAt;
+        Assert.Equal((status, expected), (outcome.ReviewStatus, outcome.NextReviewAt));
+        Assert.Equal((status, (DateTimeOffset?)expected), await TopicAt(reinforcementAt));
+    }
+
+    [Fact]
+    public async Task PerfectReinforcement_StartsAtTenDays_AndTheNextOnTimePerfectGetsThirty()
+    {
+        await Review(1, Now);
+        var reinforcementAt = Now.AddHours(1);
+
+        var reinforcement = await Review(3, reinforcementAt);
+        var nextDue = reinforcementAt.AddDays(10);
+        Assert.Equal((ReviewStatus.Scheduled, nextDue), (reinforcement.ReviewStatus, reinforcement.NextReviewAt));
+
+        var onTime = await Review(3, nextDue);
+        Assert.Equal(nextDue.AddDays(30), onTime.NextReviewAt);
+    }
+
     [Fact]
     public async Task DueNonPerfectReview_BreaksTheSequence()
     {

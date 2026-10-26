@@ -100,13 +100,19 @@ public sealed class TopicsPersistenceTests : IDisposable
             (detail.Id, detail.ReviewStatus, detail.LatestTest, detail.NextReviewAt, detail.LastReviewedAt));
         Assert.Equal(3, detail.QuestionCount);
         Assert.Equal(new[] { "Temel Özdeşlik", "Oran Kuralı", "Sık Karıştırılan" }, detail.SummaryPoints.Select(point => point.Tag));
-        Assert.Equal(new SummaryPoint("📌", "Temel Özdeşlik", "sin²x + cos²x = 1", "Kareler toplamı daima 1’dir."), detail.SummaryPoints[0]);
+        Assert.Equal(
+            new SummaryPoint("📌", "Temel Özdeşlik", "sin²x + cos²x = 1", "Kareler toplamı daima 1’dir."),
+            detail.SummaryPoints[0] with { Detail = null, Example = null });
+        Assert.Contains("cos²x + sin²x = 1", detail.SummaryPoints[0].Detail);
 
         var json = JsonSerializer.Serialize(detail, new JsonSerializerOptions(JsonSerializerDefaults.Web));
         Assert.DoesNotContain("correctIndex", json);
         Assert.DoesNotContain("explanation", json);
         Assert.DoesNotContain("options", json);
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(json, "\"note\""));
+        // Every point carries its longer reinforcement explanation.
+        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(json, "\"detail\"").Count);
+        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(json, "\"example\"").Count);
     }
 
     [Fact]
@@ -135,7 +141,14 @@ public sealed class TopicsPersistenceTests : IDisposable
         using var context = CreateContext();
         foreach (var topic in context.Topics.Include(t => t.Questions).ToList())
         {
-            Assert.Equal(3, SeedData.GetSummaryPoints(topic.Id).Count);
+            var points = SeedData.GetSummaryPoints(topic.Id);
+            Assert.Equal(3, points.Count);
+            // The reinforcement flow teaches each point: a 3–5 sentence lesson and a worked example.
+            Assert.All(points, point =>
+            {
+                Assert.InRange(point.Detail!.Split(". ").Length, 3, 5);
+                Assert.False(string.IsNullOrWhiteSpace(point.Example));
+            });
             Assert.Equal(new[] { 1, 2, 3 }, topic.Questions.OrderBy(q => q.SortOrder).Select(q => q.SortOrder));
             Assert.All(topic.Questions, question =>
             {

@@ -6,10 +6,12 @@ interface ModalShellProps {
   /** Called for Escape, backdrop clicks and any in-modal close action */
   onClose: () => void
   labelledBy: string
-  /** 'wide' (880px) for the Retain review flow; other modals keep the default width */
-  size?: 'default' | 'wide'
+  /** 'wide' (880px) for the Retain review flow, 'medium' (760px) for reinforcement; others keep the default width */
+  size?: 'default' | 'medium' | 'wide'
   children: ReactNode
 }
+
+const MAX_WIDTH = { default: 'max-w-lg', medium: 'max-w-[760px]', wide: 'max-w-[880px]' }
 
 /**
  * Shared modal frame built on the native <dialog> element: showModal() provides
@@ -53,7 +55,7 @@ function ModalShell({ isOpen, onClose, labelledBy, size = 'default', children }:
       aria-labelledby={labelledBy}
       onCancel={handleCancel}
       onClick={handleBackdropClick}
-      className={`m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] overflow-visible bg-transparent p-0 backdrop:bg-ink/40 backdrop:backdrop-blur-xs motion-safe:backdrop:animate-fade-in ${size === 'wide' ? 'max-w-[880px]' : 'max-w-lg'}`}
+      className={`m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] overflow-visible bg-transparent p-0 backdrop:bg-ink/40 backdrop:backdrop-blur-xs motion-safe:backdrop:animate-fade-in ${MAX_WIDTH[size]}`}
     >
       {isOpen && (
         // At most the viewport height (16px margin on every side); longer content scrolls inside,

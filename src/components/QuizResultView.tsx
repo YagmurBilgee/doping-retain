@@ -1,11 +1,13 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { CalendarCheck, PlayCircle } from 'lucide-react'
 import type { ReviewCompletion } from '../api/types'
-import { formatScore, getStatusPresentation, scheduleText, testTypeLabel } from './reviewPresentation'
+import { LESSON_VIDEO_NOTICE, formatScore, getStatusPresentation, scheduleText, testTypeLabel } from './reviewPresentation'
 
 interface QuizResultViewProps {
   /** Outcome stored by the server; nothing here is recalculated */
   outcome: ReviewCompletion
+  /** Which flow the quiz ended; only the headline differs, the outcome is the same kind */
+  variant?: 'review' | 'reinforcement'
   onFinish: () => void
 }
 
@@ -30,7 +32,7 @@ const SCORE_COPY: Record<'full' | 'partial' | 'zero', ScoreCopy> = {
   },
 }
 
-function QuizResultView({ outcome, onFinish }: QuizResultViewProps) {
+function QuizResultView({ outcome, variant = 'review', onFinish }: QuizResultViewProps) {
   const { score, total, testResult } = outcome
   const isPerfect = total > 0 && score === total
   // Only a confirmed 0 score is sent back to the lesson video.
@@ -58,7 +60,8 @@ function QuizResultView({ outcome, onFinish }: QuizResultViewProps) {
           {score} / {total} doğru
         </span>
         <h2 id="mini-quiz-title" className="mt-2 text-xl font-bold tracking-tight text-ink">
-          Tekrar tamamlandı
+          {/* The session ended; whether the topic is learned is left to the score and the recommendation. */}
+          {variant === 'reinforcement' ? 'Pekiştirme tamamlandı' : 'Tekrar tamamlandı'}
         </h2>
         <p className="mt-1 text-sm text-ink-secondary">{copy.message(total)}</p>
       </header>
@@ -81,7 +84,14 @@ function QuizResultView({ outcome, onFinish }: QuizResultViewProps) {
         </div>
       </div>
 
-      {recommendLessonVideo && <LessonVideoRecommendation topicTitle={outcome.updatedTopic.title} />}
+      {recommendLessonVideo && (
+        <>
+          <p className="mt-4 text-sm text-ink-secondary">
+            Şimdi konuyu pekiştir. Bir sonraki tekrar tarihin, yeni test sonucuna göre belirlenecek.
+          </p>
+          <LessonVideoRecommendation topicTitle={outcome.updatedTopic.title} />
+        </>
+      )}
 
       <button
         type="button"
@@ -160,13 +170,10 @@ function ConfettiBurst({ sessionId }: { sessionId: string }) {
 /** Points a student who missed every question back to the topic's lesson video. */
 function LessonVideoRecommendation({ topicTitle }: { topicTitle: string }) {
   const [showPrototypeNotice, setShowPrototypeNotice] = useState(false)
-
-  // Integration boundary: the real app opens this topic's lesson video page in Doping Hafıza here.
-  // The prototype has no such route, so it only explains what would happen.
   const openLessonVideo = () => setShowPrototypeNotice(true)
 
   return (
-    <section className="mt-5 rounded-tile border border-line p-card-sm" aria-labelledby="lesson-video-title">
+    <section className="mt-3 rounded-tile border border-line p-card-sm" aria-labelledby="lesson-video-title">
       <div className="flex items-center gap-3">
         <span className="flex aspect-video w-24 shrink-0 items-center justify-center rounded-tile bg-brand text-white" aria-hidden="true">
           <PlayCircle size={28} />
@@ -185,7 +192,7 @@ function LessonVideoRecommendation({ topicTitle }: { topicTitle: string }) {
       </button>
       {/* Always rendered so screen readers announce the message when it appears. */}
       <p role="status" className="mt-2 text-xs text-ink-secondary empty:mt-0">
-        {showPrototypeNotice && 'Gerçek uygulamada bu konunun ders videosu sayfası açılacak.'}
+        {showPrototypeNotice && LESSON_VIDEO_NOTICE}
       </p>
     </section>
   )

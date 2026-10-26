@@ -10,9 +10,11 @@ interface MemoryRiskCardProps {
   /** Estimated micro-review duration shown on each due topic's button */
   reviewMinutes?: number
   onStartReview?: (topicId: string) => void
+  /** A topic in the support-needed list: opens the reinforcement flow */
+  onStartReinforcement?: (topicId: string) => void
 }
 
-function MemoryRiskCard({ topics, onRetry, reviewMinutes = 5, onStartReview }: MemoryRiskCardProps) {
+function MemoryRiskCard({ topics, onRetry, reviewMinutes = 5, onStartReview, onStartReinforcement }: MemoryRiskCardProps) {
   const data = topics.status === 'ready' ? topics.data : undefined
   // Backend priority order; the heading counts exactly what is listed.
   const dueTopics = data?.dueTopicIds.flatMap((id) => data.topics.filter((topic) => topic.id === id)) ?? []
@@ -65,7 +67,7 @@ function MemoryRiskCard({ topics, onRetry, reviewMinutes = 5, onStartReview }: M
         ))}
 
       {data && supportTopics.length > 0 && (
-        <TopicList id="support-topics-title" title="Pekiştirme Önerilen Konular" topics={supportTopics} evaluatedAt={data.evaluatedAt} onOpenTopic={onStartReview} />
+        <TopicList id="support-topics-title" title="Pekiştirme Önerilen Konular" topics={supportTopics} evaluatedAt={data.evaluatedAt} onOpenTopic={onStartReinforcement} />
       )}
 
       {data && noDataTopics.length > 0 && (

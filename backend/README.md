@@ -219,7 +219,10 @@ Answers and completions that commit first are undone by the reset; ones that run
 session gone and get `404 session_not_found`.
 
 `GET /api/topics/{id}` returns the same fields for one topic plus `questionCount`, `summaryPoints`
-(`icon`, `tag`, `text`, optional `note`) and `evaluatedAt`. The summary points are static demo content
+(`icon`, `tag`, `text`, optional `note`, optional `detail`) and `evaluatedAt`. `detail` is a longer
+explanation of the same point; the frontend's reinforcement flow (a topic opened from the support-needed
+list: optional lesson video, the three explanations, then the same mini quiz) shows it step by step.
+That flow completes an ordinary review session, so every scheduling rule above applies unchanged. The summary points are static demo content
 served from `SeedData`, not stored in the database. Quiz answers and explanations are not included.
 
 `GET /api/topics` returns, per topic, `id`, `title`, `category`, `reviewStatus` (`insufficient_data` /

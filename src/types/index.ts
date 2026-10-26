@@ -8,4 +8,8 @@ export interface SummaryPoint {
   text: string
   /** Optional plain-language reminder */
   note?: string
+  /** Short lesson on the same point, shown step by step in the reinforcement flow */
+  detail?: string
+  /** Short worked example for the lesson */
+  example?: string
 }

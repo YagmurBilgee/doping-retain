@@ -134,8 +134,14 @@ public sealed class SessionAnswer
 /// <param name="Tag">Memory tag, e.g. "Temel Özdeşlik".</param>
 /// <param name="Text">The formula or fact itself.</param>
 /// <param name="Note">Optional plain-language reminder; omitted from JSON when absent.</param>
+/// <param name="Detail">
+/// Short lesson (3–5 sentences) on the same point, shown step by step in the reinforcement flow; omitted from JSON when absent.
+/// </param>
+/// <param name="Example">A short worked example for the lesson; omitted from JSON when absent.</param>
 public sealed record SummaryPoint(
     string Icon,
     string Tag,
     string Text,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Note = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Note = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Detail = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Example = null);

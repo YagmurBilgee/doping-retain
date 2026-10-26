@@ -9,6 +9,8 @@ interface MiniQuizModalProps {
   /** Session started by an explicit user action; mount this component per session. */
   session: ReviewSession
   topicTitle: string
+  /** A reinforcement of a support-needed topic ends with its own headline; the quiz itself is the same */
+  variant?: 'review' | 'reinforcement'
   /**
    * Closing never completes the review; an unfinished session resumes on the next start.
    * completionUncertain: completion was sent but no outcome confirmed it (for example a lost response),
@@ -110,7 +112,7 @@ function quizReducer(state: QuizState, action: QuizAction): QuizState {
 
 const OPTION_LETTERS = ['A', 'B', 'C', 'D', 'E']
 
-function MiniQuizModal({ session, topicTitle, onClose, onCompleted }: MiniQuizModalProps) {
+function MiniQuizModal({ session, topicTitle, variant = 'review', onClose, onCompleted }: MiniQuizModalProps) {
   const [state, dispatch] = useReducer(quizReducer, session, initQuiz)
   // One request at a time; a ref so a double click cannot slip in before the next render.
   const inFlight = useRef(false)
@@ -194,7 +196,7 @@ function MiniQuizModal({ session, topicTitle, onClose, onCompleted }: MiniQuizMo
       {/* Keyed per step so each question and the result fade in on change. */}
       <div key={stepKey} className="motion-safe:animate-fade-in">
         {state.outcome ? (
-          <QuizResultView outcome={state.outcome} onFinish={close} />
+          <QuizResultView outcome={state.outcome} variant={variant} onFinish={close} />
         ) : state.sessionProblem ? (
           <SessionProblem
             message={state.sessionProblem}

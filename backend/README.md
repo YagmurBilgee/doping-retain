@@ -35,7 +35,7 @@ dotnet test DopingRetain.Api.Tests
 - `RetentionModelTests` cover the pure formula and schedule; `ReviewScheduleTests` cover the separate
   review scheduling policy (10 → 30 days, early retries, resets, schema update) with a fixed clock.
 - `TopicsPersistenceTests`, `DemoClockTests`, `ReviewSessionServiceTests`, `ReviewCompletionTests`,
-  `DemoResetTests`, `WeeklyReviewedTopicsTests` and `TestResultServiceTests` use a temporary SQLite file
+  `DemoResetTests`, `WeeklyReviewedTopicsTests`, `WeeklySummaryTests` and `TestResultServiceTests` use a temporary SQLite file
   per test and never touch the development database.
 
 ## Persistence
@@ -163,6 +163,7 @@ Do not reuse a fixed-clock database with the system clock if its timestamp lies 
 | GET    | `/api/health` | `200 {"status":"ok"}` |
 | GET    | `/api/topics` | Demo student's topics evaluated at one instant (`evaluatedAt`), in display order |
 | GET    | `/api/topics/{id}` | One topic with its micro-review content (`404 topic_not_found` if unknown) |
+| GET    | `/api/weekly-summary` | Read-only summary of the current Monday–Sunday week (see below) |
 | POST   | `/api/topics/{id}/test-results` | Demo contract: record a normal test, `201` (`400 invalid_request` / `invalid_score` / `future_completion`, `404 topic_not_found`) |
 | POST   | `/api/topics/{id}/review-sessions` | Start or resume a review session (see below) |
 | POST   | `/api/review-sessions/{id}/answers` | Record one answer and return its feedback (see below) |
@@ -224,6 +225,15 @@ explanation of the same point; the frontend's reinforcement flow (a topic opened
 list: optional lesson video, the three explanations, then the same mini quiz) shows it step by step.
 That flow completes an ordinary review session, so every scheduling rule above applies unchanged. The summary points are static demo content
 served from `SeedData`, not stored in the database. Quiz answers and explanations are not included.
+
+`GET /api/weekly-summary` returns `firstDate`, `lastDate` and `today` (Istanbul calendar dates),
+`distinctTopicCount` (distinct topics over the whole week, the same number as `weeklyReviewedTopicCount`),
+`completedReviewCount`, `activeDayCount` and seven `days` (Monday to Sunday) with `date`, `distinctTopicCount` and
+`topics`: one row per topic with `reviewCount` and the day's latest completion (`lastCompletedAt`, `correctCount`,
+`totalQuestions`). Both endpoints count the same rows (`Topics/ReviewWeek.cs`): the demo student's `Completed` review
+sessions (normal reviews and reinforcements alike) from Monday 00:00 to the next Monday 00:00 in Europe/Istanbul and
+not after the evaluation instant. Normal tests and open or abandoned sessions never count; a retried completion is
+one session, so it counts once. Timestamps stay UTC; only the grouping into days and weeks uses Istanbul time.
 
 `GET /api/topics` returns, per topic, `id`, `title`, `category`, `reviewStatus` (`insufficient_data` /
 `scheduled` / `due` / `support_needed`), `latestTest` (`testType`, `completedAt`, `correctCount`,

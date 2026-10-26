@@ -53,6 +53,27 @@ export function daysSinceTest(completedAt: string, referenceIso: string): number
   return Math.max(0, calendarDaysBetween(completedAt, referenceIso))
 }
 
+/** Istanbul clock time, e.g. "14:30". */
+export function formatTime(iso: string): string {
+  return TIME_FORMAT.format(new Date(iso))
+}
+
+// Calendar dates (yyyy-MM-dd) from the backend are already Istanbul days: format them as UTC dates so no shift applies.
+const CALENDAR_DAY = new Intl.DateTimeFormat('tr-TR', { timeZone: 'UTC', day: 'numeric', month: 'long' })
+const CALENDAR_DAY_YEAR = new Intl.DateTimeFormat('tr-TR', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' })
+const CALENDAR_WEEKDAY = new Intl.DateTimeFormat('tr-TR', { timeZone: 'UTC', weekday: 'long' })
+
+/** "19 Ekim – 25 Ekim 2026" for a Monday–Sunday pair of calendar dates. */
+export function formatDateRange(first: string, last: string): string {
+  return `${CALENDAR_DAY.format(new Date(`${first}T00:00:00Z`))} – ${CALENDAR_DAY_YEAR.format(new Date(`${last}T00:00:00Z`))}`
+}
+
+/** "Çarşamba, 21 Ekim" for a calendar date. */
+export function formatCalendarDay(date: string): string {
+  const day = new Date(`${date}T00:00:00Z`)
+  return `${CALENDAR_WEEKDAY.format(day)}, ${CALENDAR_DAY.format(day)}`
+}
+
 /** "21 Ekim Çarşamba", or "bugün 14:30" when it falls on the reference day. */
 export function formatDate(iso: string, referenceIso: string): string {
   return calendarDaysBetween(referenceIso, iso) === 0 ? `bugün ${TIME_FORMAT.format(new Date(iso))}` : DATE_FORMAT.format(new Date(iso))

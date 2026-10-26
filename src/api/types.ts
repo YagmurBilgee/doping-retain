@@ -94,6 +94,43 @@ export interface ReviewCompletion {
   testResult: TestResult
 }
 
+/** One topic in a day of the weekly summary: the day's completions of it, merged into one row. */
+export interface WeeklySummaryTopic {
+  topicId: string
+  title: string
+  category: string
+  /** Completed review sessions of this topic that day */
+  reviewCount: number
+  /** The day's latest completion (ISO 8601 UTC) */
+  lastCompletedAt: string
+  /** Score of that latest completion; null only for a session without a stored result */
+  correctCount: number | null
+  totalQuestions: number | null
+}
+
+/** One Istanbul calendar day of the current week. */
+export interface WeeklySummaryDay {
+  /** yyyy-MM-dd */
+  date: string
+  /** Distinct topics completed that day */
+  distinctTopicCount: number
+  topics: WeeklySummaryTopic[]
+}
+
+/** GET /api/weekly-summary: the current Monday–Sunday week (Europe/Istanbul), counted by the backend. */
+export interface WeeklySummary {
+  firstDate: string
+  lastDate: string
+  today: string
+  /** Distinct topics over the whole week, the same number as the homepage counter */
+  distinctTopicCount: number
+  completedReviewCount: number
+  activeDayCount: number
+  /** Monday to Sunday */
+  days: WeeklySummaryDay[]
+  evaluatedAt: string
+}
+
 export type LoadState<T> =
   | { status: 'loading' }
   | { status: 'error'; message: string }

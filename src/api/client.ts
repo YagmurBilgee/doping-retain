@@ -1,4 +1,4 @@
-import type { AnswerFeedback, ReviewCompletion, ReviewSession, TopicDetail, TopicsResponse } from './types'
+import type { AnswerFeedback, ReviewCompletion, ReviewSession, TopicDetail, TopicsResponse, WeeklySummary } from './types'
 
 /** A failed API call: the backend's { code, message } body when it sent one. */
 export class ApiError extends Error {
@@ -65,6 +65,9 @@ export const getTopics = (signal?: AbortSignal) => getJson<TopicsResponse>('/top
 
 export const getTopic = (topicId: string, signal?: AbortSignal) =>
   getJson<TopicDetail>(`/topics/${encodeURIComponent(topicId)}`, signal)
+
+/** The current week's completed reviews, grouped by Istanbul day. */
+export const getWeeklySummary = (signal?: AbortSignal) => getJson<WeeklySummary>('/weekly-summary', signal)
 
 /** Starts a review session, or resumes the open one with its recorded answers. */
 export const startReviewSession = (topicId: string, signal?: AbortSignal) =>

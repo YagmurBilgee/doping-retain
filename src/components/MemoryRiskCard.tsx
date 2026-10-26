@@ -12,9 +12,18 @@ interface MemoryRiskCardProps {
   onStartReview?: (topicId: string) => void
   /** A topic in the support-needed list: opens the reinforcement flow */
   onStartReinforcement?: (topicId: string) => void
+  /** Opens the weekly summary next to the weekly counter */
+  onOpenWeeklySummary?: () => void
 }
 
-function MemoryRiskCard({ topics, onRetry, reviewMinutes = 5, onStartReview, onStartReinforcement }: MemoryRiskCardProps) {
+function MemoryRiskCard({
+  topics,
+  onRetry,
+  reviewMinutes = 5,
+  onStartReview,
+  onStartReinforcement,
+  onOpenWeeklySummary,
+}: MemoryRiskCardProps) {
   const data = topics.status === 'ready' ? topics.data : undefined
   // Backend priority order; the heading counts exactly what is listed.
   const dueTopics = data?.dueTopicIds.flatMap((id) => data.topics.filter((topic) => topic.id === id)) ?? []
@@ -75,18 +84,25 @@ function MemoryRiskCard({ topics, onRetry, reviewMinutes = 5, onStartReview, onS
       )}
 
       {/* Only from a loaded response, so loading or errors never show a made-up zero. */}
-      {data && <WeeklyReviews count={data.weeklyReviewedTopicCount} />}
+      {data && <WeeklyReviews count={data.weeklyReviewedTopicCount} onOpenSummary={onOpenWeeklySummary} />}
     </section>
   )
 }
 
-/** Secondary footer with the server's weekly count of distinct reviewed topics. */
-function WeeklyReviews({ count }: { count: number }) {
+/** Secondary footer with the server's weekly count of distinct reviewed topics and the weekly summary button. */
+function WeeklyReviews({ count, onOpenSummary }: { count: number; onOpenSummary?: () => void }) {
   return (
-    <p className="mt-4 flex items-center gap-1.5 border-t border-line pt-3 text-xs text-ink-muted">
-      <CalendarCheck size={14} className="shrink-0" aria-hidden="true" />
-      {count > 0 ? `Bu hafta ${count} farklı konuyu tekrar ettin.` : 'Bu haftaki ilk tekrarını yapmaya hazır mısın?'}
-    </p>
+    <div className="mt-4 flex items-center gap-2 border-t border-line pt-3">
+      <p className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-ink-muted">
+        <CalendarCheck size={14} className="shrink-0" aria-hidden="true" />
+        {count > 0 ? `Bu hafta ${count} farklı konuyu tekrar ettin.` : 'Bu haftaki ilk tekrarını yapmaya hazır mısın?'}
+      </p>
+      {onOpenSummary && (
+        <button type="button" className="btn-secondary shrink-0 px-2.5 py-1 text-xs" onClick={onOpenSummary}>
+          Haftalık Özet
+        </button>
+      )}
+    </div>
   )
 }
 

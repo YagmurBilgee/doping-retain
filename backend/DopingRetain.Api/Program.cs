@@ -64,6 +64,9 @@ app.MapGet("/api/topics/{id}", async (
         ? Results.Ok(topic)
         : Results.Json(new ApiError("topic_not_found", $"Topic '{id}' does not exist."), statusCode: StatusCodes.Status404NotFound));
 
+app.MapGet("/api/weekly-summary", (AppDbContext db, TimeProvider timeProvider, CancellationToken cancellationToken) =>
+    WeeklySummaryQuery.GetAsync(db, SeedData.DemoStudentId, timeProvider.GetUtcNow(), cancellationToken));
+
 // Demo integration contract for normal test results (see TestResultService); not an existing company integration.
 app.MapPost("/api/topics/{id}/test-results",
     async (string id, RecordTestResultRequest request, TestResultService results, CancellationToken cancellationToken) =>

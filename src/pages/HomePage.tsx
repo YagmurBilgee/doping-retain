@@ -7,6 +7,7 @@ import MiniQuizModal from '../components/MiniQuizModal'
 import Sidebar from '../components/Sidebar'
 import TopBar from '../components/TopBar'
 import TopicDetailModal from '../components/TopicDetailModal'
+import WeeklySummaryModal from '../components/WeeklySummaryModal'
 import Announcements from '../components/home/Announcements'
 import DailyProgram from '../components/home/DailyProgram'
 import DailyTasksCard from '../components/home/DailyTasksCard'
@@ -24,6 +25,8 @@ function HomePage() {
   // Modals remember the reset epoch they opened in; their results are dropped once a reset has started.
   const [detail, setDetail] = useState<{ topicId: string; flow: ReviewFlow; epoch: number } | null>(null)
   const [quiz, setQuiz] = useState<{ session: ReviewSession; topicTitle: string; flow: ReviewFlow; epoch: number } | null>(null)
+  // Mounted per open, so the summary is loaded fresh every time it opens.
+  const [isWeeklySummaryOpen, setIsWeeklySummaryOpen] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
   const [resetError, setResetError] = useState<string>()
 
@@ -83,6 +86,7 @@ function HomePage() {
       resetEpoch.current++
       setDetail(null)
       setQuiz(null)
+      setIsWeeklySummaryOpen(false)
     } catch (error) {
       setResetError(errorMessage(error))
     } finally {
@@ -121,6 +125,7 @@ function HomePage() {
               onRetry={reloadTopics}
               onStartReview={(topicId) => openDetail(topicId)}
               onStartReinforcement={(topicId) => openDetail(topicId, 'reinforcement')}
+              onOpenWeeklySummary={() => setIsWeeklySummaryOpen(true)}
             />
             <DailyProgram />
             {import.meta.env.DEV && (
@@ -139,6 +144,8 @@ function HomePage() {
           onSessionStarted={handleSessionStarted}
         />
       )}
+
+      {isWeeklySummaryOpen && <WeeklySummaryModal onClose={() => setIsWeeklySummaryOpen(false)} />}
 
       {quiz && (
         <MiniQuizModal

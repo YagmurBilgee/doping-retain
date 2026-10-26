@@ -106,7 +106,13 @@ public sealed class ReviewSession
     /// <summary>StudentTopicState.Version when the session opened; completion requires it to be unchanged.</summary>
     public int StateVersionAtStart { get; init; }
     public DateTimeOffset? CompletedAt { get; set; }
+    /// <summary>Effective next review set by completion (see ReviewSchedulePolicy); the topic follows it while this quiz is its latest result.</summary>
     public DateTimeOffset? NextReviewAt { get; set; }
+    /// <summary>
+    /// Consecutive on-time perfect mini quizzes as of this completion; 0 when the sequence is broken. Sessions
+    /// completed before this column existed read 0, so legacy history never unlocks the extended interval.
+    /// </summary>
+    public int PerfectReviewStreak { get; set; }
     /// <summary>Completion response as JSON, written once and returned verbatim on retries.</summary>
     public string? OutcomeJson { get; set; }
     public List<SessionAnswer> Answers { get; init; } = [];

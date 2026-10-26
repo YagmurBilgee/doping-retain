@@ -32,7 +32,8 @@ cd backend
 dotnet test DopingRetain.Api.Tests
 ```
 
-- `RetentionModelTests` cover the pure formula and schedule.
+- `RetentionModelTests` cover the pure formula and schedule; `ReviewScheduleTests` cover the separate
+  review scheduling policy (10 → 30 days, early retries, resets, schema update) with a fixed clock.
 - `TopicsPersistenceTests`, `DemoClockTests`, `ReviewSessionServiceTests`, `ReviewCompletionTests`,
   `DemoResetTests`, `WeeklyReviewedTopicsTests` and `TestResultServiceTests` use a temporary SQLite file
   per test and never touch the development database.
@@ -45,9 +46,12 @@ dotnet test DopingRetain.Api.Tests
   `backend/DopingRetain.Api/App_Data/retain-phase6.db`. An absolute path is used as is.
   The startup log prints the database path in use.
 - **Schema:** created with `EnsureCreated` on startup; there are no migrations.
-  `EnsureCreated` does nothing when the file already exists, so each schema change uses a new file.
+  `EnsureCreated` does nothing when the file already exists, so earlier schema changes used a new file.
   If the configured file lacks a table or column of the current schema, startup fails and lists the
-  missing columns; the file is never altered or deleted.
+  missing columns without altering the file. One exception is additive: a Phase 6 file that lacks only
+  `ReviewSessions.PerfectReviewStreak` gets that column (`INTEGER NOT NULL DEFAULT 0`) on startup, in one
+  transaction, and keeps every row. Existing completions read 0, so earlier history never counts toward
+  the extended review interval. Files are never deleted or reseeded.
 - **Seed (demo scenario):** runs only when the database has no student; the demo reset restores the same
   scenario. Five topics from five subjects each get one **synthetic** normal-test result (made-up demo
   data, not a real student's). Its completion time is derived backwards from the moment its curve should
@@ -89,6 +93,35 @@ without a test has insufficient data.
 
 `RetentionModel:HalfLifeDays` (10) and `RetentionModel:ReviewThreshold` (0.50) in `appsettings.json` are
 provisional, shared demo assumptions, not scientific constants; nothing learns or personalizes them.
+
+## Review scheduling policy
+
+The curve above is the baseline. `Memory/ReviewSchedulePolicy.cs` (pure) is a separate product rule that
+decides which review time applies after a reminder mini quiz; it never changes h, the threshold or the
+estimated recall. "On time" means completed at or after the topic's current recommended review time
+(a due, support-needed or no-data topic is always on time).
+
+| Mini quiz | Next review | Perfect sequence |
+|---|---|---|
+| Perfect, on time, first of a sequence | formula: 10 days | 1 |
+| Perfect, on time, after an on-time perfect one | `ReviewSchedule:ExtendedIntervalDays` (30) after completion; never longer | +1 |
+| Perfect, early | unchanged: no extension, no shortening, no postponement | unchanged |
+| 2/3 (early or on time) | formula: ≈ 4.15 days | reset to 0 |
+| 0/3 or 1/3 (early or on time) | now (support needed) | reset to 0 |
+
+- Only completed reminder mini quizzes count. A normal test never counts as a perfect review.
+- A newer normal test becomes the latest observation and uses the formula; any extended schedule and the
+  sequence no longer apply, so the next mini quizzes start a fresh sequence. A normal test completed
+  before the latest result (submitted late) changes nothing.
+- Persisted state: each completed session stores its effective `NextReviewAt` (existing column) and
+  `PerfectReviewStreak`. While a mini quiz is the topic's latest result, its session's `NextReviewAt`
+  decides `scheduled` vs `due` for topic queries, the due list and the homepage; recall (for ordering) and
+  `support_needed` still come from the curve. Completion is idempotent, so a retried completion returns
+  its stored outcome and never advances the sequence.
+- `ExtendedIntervalDays` (default 30) is a configurable product policy, not a learned half-life or a
+  scientific result. It must be at least the formula's interval for a perfect score,
+  `h · log2(1 / threshold)` from the configured `RetentionModel` values (10 days by default); otherwise
+  startup fails before the database is opened.
 
 ## Normal test results (demo integration contract)
 
@@ -160,8 +193,8 @@ review date; only completion does.
 - Completion takes no request body. The score comes from the stored answers and every question must be
   answered. One timestamp is used for the whole completion. The quiz's actual score is stored as a
   `reminder_mini_quiz` test result (unique per session), the topic's `LastReviewedAt` is set, and the
-  session's `Completed` status, `CompletedAt`, `NextReviewAt` (from the retention model) and the outcome
-  snapshot are saved in one transaction. A completed session returns that snapshot unchanged and stores nothing.
+  session's `Completed` status, `CompletedAt`, `NextReviewAt` and `PerfectReviewStreak` (from the review
+  scheduling policy) and the outcome snapshot are saved in one transaction. A completed session returns that snapshot unchanged and stores nothing.
 - The outcome has `sessionId`, `score`, `total`, `reviewStatus`, `testResult`, `completedAt`,
   `nextReviewAt` and `updatedTopic` (`id`, `title`, `category`, `lastReviewedAt`).
 - Concurrency: completion runs in a `BEGIN IMMEDIATE` transaction, so it and answer inserts never

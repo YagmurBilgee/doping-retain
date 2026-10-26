@@ -25,7 +25,11 @@ public sealed record AnswerFeedbackDto(
     string? Explanation);
 
 /// <summary>Completion result: the quiz's stored score and the retention model's recommendation from it.</summary>
-/// <param name="NextReviewAt">Where this quiz's curve reaches the threshold; CompletedAt when support is needed now.</param>
+/// <param name="NextReviewAt">
+/// The policy's next review (ReviewSchedulePolicy): usually where this quiz's curve reaches the threshold, the
+/// extended interval after consecutive on-time perfect quizzes, or the unchanged schedule after an early perfect
+/// retry; CompletedAt when support is needed now.
+/// </param>
 public sealed record ReviewCompletionResponse(
     Guid SessionId,
     int Score,

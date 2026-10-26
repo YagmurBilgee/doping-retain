@@ -22,7 +22,7 @@ export interface TopicSummary {
   reviewStatus: ReviewStatus
   /** Latest relevant completed test (normal test or mini quiz); null without data */
   latestTest: TestResult | null
-  /** When estimated recall reaches the review threshold (ISO 8601 UTC) */
+  /** Effective next review set by the backend (formula or its scheduling policy), ISO 8601 UTC */
   nextReviewAt: string | null
   /** Completion of the latest reminder + mini quiz review; normal tests never set it */
   lastReviewedAt: string | null
@@ -88,7 +88,7 @@ export interface ReviewCompletion {
   total: number
   updatedTopic: CompletedTopic
   completedAt: string
-  /** Where this quiz's curve reaches the threshold; completedAt when support is needed now */
+  /** The backend's next review after this quiz; completedAt when support is needed now */
   nextReviewAt: string
   reviewStatus: ReviewStatus
   testResult: TestResult

@@ -278,9 +278,21 @@ public static class SeedData
     }
 
     /// <summary>
+    /// Columns added after the Phase 6 schema that an existing file can safely receive in place: additive,
+    /// with a default that keeps every stored row's meaning. ReviewSessions.PerfectReviewStreak = 0 means
+    /// earlier completions never count toward the extended review interval.
+    /// </summary>
+    private static readonly Dictionary<string, string> AdditiveColumns = new()
+    {
+        ["ReviewSessions.PerfectReviewStreak"] =
+            "ALTER TABLE \"ReviewSessions\" ADD COLUMN \"PerfectReviewStreak\" INTEGER NOT NULL DEFAULT 0",
+    };
+
+    /// <summary>
     /// EnsureCreated leaves an existing file as is, so a database from an earlier schema lacks newer
-    /// tables or columns. Fail at startup with a clear message instead of on a later request;
-    /// never alter the file.
+    /// tables or columns. When only additive columns are missing they are added in one transaction and no
+    /// row is changed; otherwise startup fails with a clear message instead of on a later request, and the
+    /// file is not altered.
     /// </summary>
     private static void EnsureSchemaIsCurrent(AppDbContext db)
     {
@@ -301,6 +313,13 @@ public static class SeedData
             .Order()
             .ToList();
 
+        if (missing.Count > 0 && missing.All(AdditiveColumns.ContainsKey))
+        {
+            using var transaction = db.Database.BeginTransaction();
+            foreach (var column in missing) db.Database.ExecuteSqlRaw(AdditiveColumns[column]);
+            transaction.Commit();
+            return;
+        }
         if (missing.Count > 0)
         {
             throw new InvalidOperationException(

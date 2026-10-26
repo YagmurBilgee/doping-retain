@@ -21,6 +21,9 @@ builder.Services.AddSingleton(clock);
 var retentionOptions = (builder.Configuration.GetSection(RetentionModelOptions.SectionName).Get<RetentionModelOptions>()
     ?? new RetentionModelOptions()).Validated();
 builder.Services.AddSingleton(retentionOptions);
+var scheduleOptions = (builder.Configuration.GetSection(ReviewScheduleOptions.SectionName).Get<ReviewScheduleOptions>()
+    ?? new ReviewScheduleOptions()).Validated(retentionOptions);
+builder.Services.AddSingleton(scheduleOptions);
 builder.Services.AddScoped<ReviewSessionService>();
 builder.Services.AddScoped<TestResultService>();
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -35,9 +38,10 @@ using (var scope = app.Services.CreateScope())
     if (clock != TimeProvider.System) DemoClock.EnsureNotBeforeRecordedTests(db, clock.GetUtcNow());
 }
 
-app.Logger.LogInformation("Database: {DatabasePath}; clock: {Clock}; half-life {HalfLifeDays} d, review threshold {ReviewThreshold}",
+app.Logger.LogInformation(
+    "Database: {DatabasePath}; clock: {Clock}; half-life {HalfLifeDays} d, review threshold {ReviewThreshold}, extended interval {ExtendedIntervalDays} d",
     databasePath, clock == TimeProvider.System ? "system UTC" : $"fixed {clock.GetUtcNow():O}",
-    retentionOptions.HalfLifeDays, retentionOptions.ReviewThreshold);
+    retentionOptions.HalfLifeDays, retentionOptions.ReviewThreshold, scheduleOptions.ExtendedIntervalDays);
 
 // Errors use the same { code, message } body as the endpoints, including unreadable request bodies.
 app.UseExceptionHandler(errorApp => errorApp.Run(async context =>

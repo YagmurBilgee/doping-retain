@@ -19,7 +19,10 @@ public sealed record TopicsResponse(
     DateTimeOffset EvaluatedAt);
 
 /// <param name="LatestTest">The latest relevant completed test (normal test or mini quiz); null without data.</param>
-/// <param name="NextReviewAt">When recall reaches the review threshold; the test's completion for support_needed.</param>
+/// <param name="NextReviewAt">
+/// Effective next review: where recall reaches the threshold, or the time the latest mini quiz's completion set
+/// (ReviewSchedulePolicy); the test's completion for support_needed.
+/// </param>
 /// <param name="LastReviewedAt">Completion of the latest reminder + mini quiz review; normal tests never set it.</param>
 public sealed record TopicSummaryDto(
     string Id,
@@ -132,7 +135,7 @@ public static class TopicsQuery
             now);
     }
 
-    /// <summary>Evaluates the student's topics (or one topic) from each topic's latest relevant test result.</summary>
+    /// <summary>Evaluates the student's topics (or one topic) from each topic's latest relevant test result and its schedule.</summary>
     private static async Task<List<EvaluatedTopic>> EvaluateAsync(
         AppDbContext db, string studentId, string? topicId, DateTimeOffset now, RetentionModelOptions options,
         CancellationToken cancellationToken)
@@ -145,25 +148,19 @@ public static class TopicsQuery
             .Select(state => new { state.TopicId, state.Topic.Title, state.Topic.Category, state.LastReviewedAt })
             .ToListAsync(cancellationToken);
 
-        // SQLite cannot order by DateTimeOffset, so the latest result per topic is picked in memory.
-        var latestByTopic = (await db.TestResults
-                .AsNoTracking()
-                .Where(result => result.StudentId == studentId && (topicId == null || result.TopicId == topicId))
-                .ToListAsync(cancellationToken))
-            .GroupBy(result => result.TopicId)
-            .ToDictionary(group => group.Key, group => TestResult.Latest(group)!);
+        var latestByTopic = await LatestObservations.LoadAsync(db, studentId, topicId, cancellationToken);
 
         return rows
             .Select(row =>
             {
                 var latest = latestByTopic.GetValueOrDefault(row.TopicId);
-                var estimate = RetentionModel.Evaluate(latest?.ToObservation(), now, options);
+                var estimate = latest?.Evaluate(now, options) ?? RetentionModel.Evaluate(null, now, options);
                 var summary = new TopicSummaryDto(
                     row.TopicId,
                     row.Title,
                     row.Category,
                     estimate.Status,
-                    latest is null ? null : TestResultDto.From(latest),
+                    latest is null ? null : TestResultDto.From(latest.Result),
                     estimate.ReviewAt,
                     row.LastReviewedAt);
                 return new EvaluatedTopic(summary, estimate);

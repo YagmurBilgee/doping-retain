@@ -1,4 +1,5 @@
 import { Book, FileCheck, LayoutList, Play, Search, type LucideIcon } from 'lucide-react'
+import type { DemoGroup } from '../../api/types'
 
 type ActivityKind = 'exam' | 'test' | 'video'
 
@@ -15,14 +16,22 @@ const KIND_STYLE: Record<ActivityKind, { tile: string; icon: LucideIcon; action:
   video: { tile: 'from-[#e2a867] to-[#d49857]', icon: Book, action: Play },
 }
 
-// Frontend demo fixture: there is no activity history source in the backend yet.
-const DEMO_RECENT_ACTIVITIES: Activity[] = [
+// Frontend demo fixtures: there is no activity history source in the backend yet.
+const YKS_ACTIVITIES: Activity[] = [
   { breadcrumb: 'TYT Kimya › Kimya Bilimi', title: 'Simyadan Kimyaya 1', kind: 'video' },
   { breadcrumb: 'TYT Türkçe › Sözcükte Anlam', title: 'Sözcüklerde Çok Anlamlılık ve Anlam İlişkileri', kind: 'video' },
   { breadcrumb: 'TYT Deneme', title: '2026 TYT Deneme Sınavı 1', kind: 'exam' },
 ]
 
-function RecentActivities() {
+// Sixth-grade sample items named after catalog materials; no TYT/AYT content in this grade.
+const SIXTH_GRADE_ACTIVITIES: Activity[] = [
+  { breadcrumb: '6. Sınıf Matematik › Asal Sayılar', title: 'Asal Sayılar ve Asal Çarpanlar Konu Testi 1', kind: 'test' },
+  { breadcrumb: '6. Sınıf Fen Bilimleri › Güneş Sistemi', title: 'Gezegenlerimizi Tanıyalım 1', kind: 'video' },
+  { breadcrumb: '6. Sınıf Türkçe › Dilimizin Zenginliği', title: 'Gerçek ve Mecaz Anlam', kind: 'video' },
+]
+
+function RecentActivities({ group }: { group: DemoGroup }) {
+  const activities = group === 'sixth_grade' ? SIXTH_GRADE_ACTIVITIES : YKS_ACTIVITIES
   return (
     <section className="min-w-0">
       <h2 className="panel-title">Son Aktivitelerim</h2>
@@ -34,7 +43,7 @@ function RecentActivities() {
         aria-label="Son aktiviteler"
       >
         <ul className="divide-y divide-[#f0f3f5]">
-          {DEMO_RECENT_ACTIVITIES.map(({ breadcrumb, title, kind }) => {
+          {activities.map(({ breadcrumb, title, kind }) => {
             const { tile, icon: Icon, action: ActionIcon } = KIND_STYLE[kind]
             return (
               <li key={title} className="flex items-center gap-2.5 px-3.5 py-3.5">

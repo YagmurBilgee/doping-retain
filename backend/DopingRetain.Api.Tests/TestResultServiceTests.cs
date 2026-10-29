@@ -103,9 +103,9 @@ public sealed class TestResultServiceTests : IDisposable
         using (var db = _database.CreateContext())
         {
             var sessions = new ReviewSessionService(db, ClockAt(Now), TestOptions.Default);
-            var session = (await sessions.StartOrResumeAsync(Trigonometry)).Value!;
-            await sessions.SubmitAnswerAsync(session.SessionId, new SubmitAnswerRequest(session.Questions[0].Id, 3));
-            Assert.Equal(409, (await sessions.CompleteAsync(session.SessionId)).StatusCode);
+            var session = (await sessions.StartOrResumeAsync(SeedData.DemoStudentId, Trigonometry)).Value!;
+            await sessions.SubmitAnswerAsync(SeedData.DemoStudentId, session.SessionId, new SubmitAnswerRequest(session.Questions[0].Id, 3));
+            Assert.Equal(409, (await sessions.CompleteAsync(SeedData.DemoStudentId, session.SessionId)).StatusCode);
         }
 
         using var check = _database.CreateContext();
@@ -120,7 +120,7 @@ public sealed class TestResultServiceTests : IDisposable
 
         using (var db = _database.CreateContext())
         {
-            Assert.Equal(200, (await new ReviewSessionService(db, ClockAt(Now.AddDays(2)), TestOptions.Default).CompleteAsync(sessionId)).StatusCode);
+            Assert.Equal(200, (await new ReviewSessionService(db, ClockAt(Now.AddDays(2)), TestOptions.Default).CompleteAsync(SeedData.DemoStudentId, sessionId)).StatusCode);
         }
 
         using var check = _database.CreateContext();
@@ -175,21 +175,21 @@ public sealed class TestResultServiceTests : IDisposable
         RecordTestResultRequest request, string topicId = Trigonometry, DateTimeOffset? at = null)
     {
         using var db = _database.CreateContext();
-        return await new TestResultService(db, ClockAt(at ?? Now)).RecordNormalTestAsync(topicId, request);
+        return await new TestResultService(db, ClockAt(at ?? Now)).RecordNormalTestAsync(SeedData.DemoStudentId, topicId, request);
     }
 
     private async Task<Guid> CompleteReview(int correctCount)
     {
         using var db = _database.CreateContext();
         var sessions = new ReviewSessionService(db, ClockAt(Now), TestOptions.Default);
-        var session = (await sessions.StartOrResumeAsync(Trigonometry)).Value!;
+        var session = (await sessions.StartOrResumeAsync(SeedData.DemoStudentId, Trigonometry)).Value!;
         int[] correct = [3, 0, 1];
         foreach (var (question, index) in session.Questions.Select((question, index) => (question, index)))
         {
             var selected = index < correctCount ? correct[index] : (correct[index] + 1) % 4;
-            await sessions.SubmitAnswerAsync(session.SessionId, new SubmitAnswerRequest(question.Id, selected));
+            await sessions.SubmitAnswerAsync(SeedData.DemoStudentId, session.SessionId, new SubmitAnswerRequest(question.Id, selected));
         }
-        Assert.Equal(200, (await sessions.CompleteAsync(session.SessionId)).StatusCode);
+        Assert.Equal(200, (await sessions.CompleteAsync(SeedData.DemoStudentId, session.SessionId)).StatusCode);
         return session.SessionId;
     }
 
@@ -202,7 +202,7 @@ public sealed class TestResultServiceTests : IDisposable
     private void AssertOnlySeedResults()
     {
         using var db = _database.CreateContext();
-        Assert.Equal(5, db.TestResults.Count());
+        Assert.Equal(5, db.TestResults.Count(result => result.StudentId == SeedData.DemoStudentId));
     }
 
     private static TimeProvider ClockAt(DateTimeOffset instant) => DemoClock.Create(instant.ToString("O"), isDevelopment: true);

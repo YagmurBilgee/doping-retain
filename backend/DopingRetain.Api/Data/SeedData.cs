@@ -5,7 +5,8 @@ using Microsoft.EntityFrameworkCore.Metadata;
 namespace DopingRetain.Api.Data;
 
 /// <summary>
-/// Demo content and the demo student's initial scenario. Five topics from five subjects each get one
+/// YKS demo content and the YKS demo student's initial scenario; the sixth-grade group lives in
+/// <see cref="SixthGradeSeed"/> and is seeded alongside it. Five topics from five subjects each get one
 /// SYNTHETIC normal-test observation (a made-up demo score, not a real student result). Its completion time
 /// is derived backwards from the moment its curve should reach the review threshold, so right after a seed
 /// or an explicit demo reset three topics are due today, one is scheduled for tomorrow and one for three
@@ -218,16 +219,38 @@ public static class SeedData
         if (db.Students.Any())
         {
             AddMissingContent(db);
+            if (!db.Students.Any(student => student.Group == DemoGroup.SixthGrade))
+            {
+                AddSixthGrade(db, seededAtUtc, withContent: false);
+                db.SaveChanges();
+            }
             return;
         }
 
-        db.Students.Add(new Student { Id = DemoStudentId, DisplayName = "Demo Öğrenci" });
+        db.Students.Add(new Student { Id = DemoStudentId, DisplayName = "Demo Öğrenci", Group = DemoGroup.Yks });
         db.Topics.AddRange(Topics.Select(CreateTopic));
         db.StudentTopicStates.AddRange(DemoTopicIds.Select(id => new StudentTopicState { StudentId = DemoStudentId, TopicId = id }));
         db.TestResults.AddRange(CreateSeedTestResults(seededAtUtc, options));
+        AddSixthGrade(db, seededAtUtc, withContent: true);
 
         // One SaveChanges runs in a single transaction, so a seed is never left half-written.
         db.SaveChanges();
+    }
+
+    /// <summary>
+    /// Adds the sixth-grade students, their topic states and initial scenario (and, on a fresh database, the
+    /// group's content). Runs only while the group has no students, so existing sixth-grade data is never changed.
+    /// </summary>
+    private static void AddSixthGrade(AppDbContext db, DateTimeOffset seededAtUtc, bool withContent)
+    {
+        if (withContent)
+        {
+            db.Topics.AddRange(SixthGradeSeed.CreateTopics(Topics.Length + 1));
+            db.NormalTestQuestions.AddRange(SixthGradeSeed.CreateNormalTestQuestions());
+        }
+        db.Students.AddRange(SixthGradeSeed.CreateStudents());
+        db.StudentTopicStates.AddRange(SixthGradeSeed.CreateStates());
+        db.TestResults.AddRange(SixthGradeSeed.CreateResults(seededAtUtc));
     }
 
     /// <summary>Topics of the demo student's scenario, in display order.</summary>
@@ -242,16 +265,23 @@ public static class SeedData
     {
         var existingTopics = db.Topics.Select(topic => topic.Id).ToHashSet();
         var existingQuestions = db.QuizQuestions.Select(question => question.Id).ToHashSet();
-        var missingTopics = Topics.Where(seed => !existingTopics.Contains(seed.Id)).ToList();
-        var missingQuestions = Topics
-            .Where(seed => existingTopics.Contains(seed.Id))
-            .SelectMany(seed => seed.Questions)
+        var existingNormalQuestions = db.NormalTestQuestions.Select(question => question.Id).ToHashSet();
+        var allTopics = Topics.Select(CreateTopic).Concat(SixthGradeSeed.CreateTopics(Topics.Length + 1)).ToList();
+        var missingTopics = allTopics.Where(topic => !existingTopics.Contains(topic.Id)).ToList();
+        var missingQuestions = allTopics
+            .Where(topic => existingTopics.Contains(topic.Id))
+            .SelectMany(topic => topic.Questions)
             .Where(question => !existingQuestions.Contains(question.Id))
             .ToList();
-        if (missingTopics.Count == 0 && missingQuestions.Count == 0) return;
+        var missingNormalQuestions = SixthGradeSeed.CreateNormalTestQuestions()
+            .Where(question => !existingNormalQuestions.Contains(question.Id))
+            .ToList();
+        if (missingTopics.Count == 0 && missingQuestions.Count == 0 && missingNormalQuestions.Count == 0) return;
 
-        db.Topics.AddRange(missingTopics.Select(CreateTopic));
+        db.Topics.AddRange(missingTopics);
         db.QuizQuestions.AddRange(missingQuestions);
+        // Topics are inserted before their questions within one SaveChanges.
+        db.NormalTestQuestions.AddRange(missingNormalQuestions);
         db.SaveChanges();
     }
 
@@ -260,6 +290,7 @@ public static class SeedData
         Id = seed.Id,
         Title = seed.Title,
         Category = seed.Category,
+        Group = DemoGroup.Yks,
         SortOrder = Array.IndexOf(Topics, seed) + 1,
         Questions = [.. seed.Questions],
     };
@@ -269,7 +300,9 @@ public static class SeedData
     /// rather than stored in the database.
     /// </summary>
     public static IReadOnlyList<SummaryPoint> GetSummaryPoints(string topicId) =>
-        Topics.SingleOrDefault(topic => topic.Id == topicId)?.SummaryPoints ?? [];
+        Topics.SingleOrDefault(topic => topic.Id == topicId)?.SummaryPoints
+        ?? SixthGradeSeed.GetSummaryPoints(topicId)
+        ?? [];
 
     /// <summary>
     /// The demo student's synthetic normal-test results for one reference instant (the first seed or a demo

@@ -3,9 +3,11 @@ import { CalendarCheck, RotateCcw } from 'lucide-react'
 import { errorMessage, getWeeklySummary } from '../api/client'
 import type { LoadState, WeeklySummary, WeeklySummaryDay } from '../api/types'
 import ModalShell from './ModalShell'
-import { formatCalendarDay, formatDateRange, formatTime } from './reviewPresentation'
+import { formatCalendarDay, formatDateRange, formatTime, topicContext } from './reviewPresentation'
 
 interface WeeklySummaryModalProps {
+  /** The student whose week is shown; fixed for this mount */
+  studentId: string
   onClose: () => void
 }
 
@@ -16,20 +18,20 @@ const WEEKDAY_SHORT = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
  * Loaded on every open, so it always reflects the latest completions; nothing is counted here.
  * Same frame as the reinforcement steps: 760 × 600 on desktop, at most the viewport, the body scrolls.
  */
-function WeeklySummaryModal({ onClose }: WeeklySummaryModalProps) {
+function WeeklySummaryModal({ studentId, onClose }: WeeklySummaryModalProps) {
   const [summary, setSummary] = useState<LoadState<WeeklySummary>>({ status: 'loading' })
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
-    getWeeklySummary(controller.signal).then(
+    getWeeklySummary(studentId, controller.signal).then(
       (data) => setSummary({ status: 'ready', data }),
       (error: unknown) => {
         if (!controller.signal.aborted) setSummary({ status: 'error', message: errorMessage(error) })
       },
     )
     return () => controller.abort()
-  }, [attempt])
+  }, [studentId, attempt])
 
   const retry = () => {
     setSummary({ status: 'loading' })
@@ -217,7 +219,7 @@ function DayTopics({ day, isToday }: { day: WeeklySummaryDay; isToday: boolean }
                 <CalendarCheck size={16} />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="section-subtitle">{topic.category}</p>
+                <p className="section-subtitle">{topicContext(topic)}</p>
                 <p className="truncate text-sm font-semibold text-ink">{topic.title}</p>
               </div>
               <div className="shrink-0 text-right text-xs text-ink-secondary">

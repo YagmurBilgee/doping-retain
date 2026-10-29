@@ -101,7 +101,7 @@ public sealed class WeeklySummaryTests : IDisposable
         using (var db = _database.CreateContext())
         {
             var recorded = await new TestResultService(db, ClockAt(Now))
-                .RecordNormalTestAsync(Trigonometry, new RecordTestResultRequest(20, 20, Now.AddHours(-2)));
+                .RecordNormalTestAsync(SeedData.DemoStudentId, Trigonometry, new RecordTestResultRequest(20, 20, Now.AddHours(-2)));
             Assert.Equal(201, recorded.StatusCode);
         }
 
@@ -116,7 +116,7 @@ public sealed class WeeklySummaryTests : IDisposable
         var sessionId = await Complete(Trigonometry, 3, Now.AddHours(-1));
         using (var db = _database.CreateContext())
         {
-            Assert.Equal(200, (await Service(db, Now).CompleteAsync(sessionId)).StatusCode);
+            Assert.Equal(200, (await Service(db, Now).CompleteAsync(SeedData.DemoStudentId, sessionId)).StatusCode);
         }
 
         var summary = await SummaryAt(Now);
@@ -190,17 +190,17 @@ public sealed class WeeklySummaryTests : IDisposable
         Guid sessionId;
         using (var db = _database.CreateContext())
         {
-            sessionId = (await Service(db, at).StartOrResumeAsync(topicId)).Value!.SessionId;
+            sessionId = (await Service(db, at).StartOrResumeAsync(SeedData.DemoStudentId, topicId)).Value!.SessionId;
         }
         foreach (var (question, index) in Questions[topicId].Select((question, index) => (question, index)))
         {
             using var db = _database.CreateContext();
             var selected = index < correctCount ? question.Correct : question.Wrong;
-            Assert.Equal(200, (await Service(db, at).SubmitAnswerAsync(sessionId, new SubmitAnswerRequest(question.Id, selected))).StatusCode);
+            Assert.Equal(200, (await Service(db, at).SubmitAnswerAsync(SeedData.DemoStudentId, sessionId, new SubmitAnswerRequest(question.Id, selected))).StatusCode);
         }
         using (var db = _database.CreateContext())
         {
-            Assert.Equal(200, (await Service(db, at).CompleteAsync(sessionId)).StatusCode);
+            Assert.Equal(200, (await Service(db, at).CompleteAsync(SeedData.DemoStudentId, sessionId)).StatusCode);
         }
         return sessionId;
     }

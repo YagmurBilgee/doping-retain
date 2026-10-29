@@ -268,7 +268,7 @@ public sealed class ReviewScheduleTests : IDisposable
         ServiceResult<ReviewCompletionResponse> retry;
         using (var db = _database.CreateContext())
         {
-            retry = await Service(db, FirstDue.AddDays(40)).CompleteAsync(qualifying.SessionId);
+            retry = await Service(db, FirstDue.AddDays(40)).CompleteAsync(SeedData.DemoStudentId, qualifying.SessionId);
         }
 
         Assert.Equal(200, retry.StatusCode);
@@ -395,18 +395,18 @@ public sealed class ReviewScheduleTests : IDisposable
         Guid sessionId;
         using (var db = _database.CreateContext())
         {
-            sessionId = (await Service(db, at, options).StartOrResumeAsync(Trigonometry)).Value!.SessionId;
+            sessionId = (await Service(db, at, options).StartOrResumeAsync(SeedData.DemoStudentId, Trigonometry)).Value!.SessionId;
         }
         foreach (var (question, index) in Questions.Select((question, index) => (question, index)))
         {
             using var db = _database.CreateContext();
             var selected = index < correctCount ? question.Correct : question.Wrong;
-            var answer = await Service(db, at, options).SubmitAnswerAsync(sessionId, new SubmitAnswerRequest(question.QuestionId, selected));
+            var answer = await Service(db, at, options).SubmitAnswerAsync(SeedData.DemoStudentId, sessionId, new SubmitAnswerRequest(question.QuestionId, selected));
             Assert.Equal(200, answer.StatusCode);
         }
         using (var db = _database.CreateContext())
         {
-            var result = await Service(db, at, options).CompleteAsync(sessionId);
+            var result = await Service(db, at, options).CompleteAsync(SeedData.DemoStudentId, sessionId);
             Assert.Equal(200, result.StatusCode);
             return result.Value!;
         }
@@ -417,7 +417,7 @@ public sealed class ReviewScheduleTests : IDisposable
     {
         using var db = _database.CreateContext();
         var result = await new TestResultService(db, ClockAt(clockAt))
-            .RecordNormalTestAsync(Trigonometry, new RecordTestResultRequest(correctCount, totalQuestions, completedAt));
+            .RecordNormalTestAsync(SeedData.DemoStudentId, Trigonometry, new RecordTestResultRequest(correctCount, totalQuestions, completedAt));
         Assert.Equal(201, result.StatusCode);
         return result.Value!;
     }

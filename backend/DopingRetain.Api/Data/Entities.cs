@@ -3,21 +3,62 @@ using DopingRetain.Api.Memory;
 
 namespace DopingRetain.Api.Data;
 
+/// <summary>
+/// A demo group: a grade with its own students and topics. A student only ever sees and reviews topics of
+/// its own group; both groups share the same retention and review implementation.
+/// </summary>
+public enum DemoGroup
+{
+    /// <summary>12th grade / YKS: the original demo student and topics.</summary>
+    Yks,
+    /// <summary>6th grade: five mock students sharing eight curriculum topics.</summary>
+    SixthGrade,
+}
+
 public sealed class Student
 {
     public required string Id { get; init; }
     public required string DisplayName { get; set; }
+    public DemoGroup Group { get; init; }
+    /// <summary>Order within the group; the first student is the group's default.</summary>
+    public int SortOrder { get; set; }
 }
 
 /// <summary>Shared topic content; per-student memory lives in <see cref="StudentTopicState"/>.</summary>
 public sealed class Topic
 {
+    /// <summary>Stable Id; for curriculum topics the catalog's topic_id, since topic names repeat across units.</summary>
     public required string Id { get; init; }
     public required string Title { get; set; }
+    /// <summary>Subject (lesson) of the topic.</summary>
     public required string Category { get; set; }
+    public DemoGroup Group { get; init; }
+    /// <summary>Curriculum unit; null for topics without catalog metadata (YKS content).</summary>
+    public int? UnitId { get; set; }
+    public string? UnitName { get; set; }
     /// <summary>Display order of topics; ties fall back to Id.</summary>
     public int SortOrder { get; set; }
     public List<QuizQuestion> Questions { get; init; } = [];
+}
+
+/// <summary>A question of a topic's normal (topic) test; separate from the reminder mini quiz questions.</summary>
+public sealed class NormalTestQuestion
+{
+    public required string Id { get; init; }
+    public required string TopicId { get; init; }
+    public int SortOrder { get; set; }
+    public required string Text { get; set; }
+    public required List<string> Options { get; set; }
+    public int CorrectIndex { get; set; }
+}
+
+/// <summary>One answer of a normal-test result; the result's score is the count of correct answers.</summary>
+public sealed class NormalTestAnswer
+{
+    public long TestResultId { get; init; }
+    public required string QuestionId { get; init; }
+    public int SelectedIndex { get; init; }
+    public bool IsCorrect { get; init; }
 }
 
 public sealed class QuizQuestion
@@ -75,6 +116,8 @@ public sealed class TestResult
     public int TotalQuestions { get; init; }
     /// <summary>The review session a mini quiz result came from; unique, so a review is recorded once.</summary>
     public Guid? ReviewSessionId { get; init; }
+    /// <summary>The individual answers of a normal test, when they are known (demo results); empty for mini quizzes.</summary>
+    public List<NormalTestAnswer> NormalTestAnswers { get; init; } = [];
 
     public TestObservation ToObservation() => new(CompletedAt, CorrectCount, TotalQuestions);
 

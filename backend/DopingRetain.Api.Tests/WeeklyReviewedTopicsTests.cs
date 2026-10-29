@@ -100,16 +100,16 @@ public sealed class WeeklyReviewedTopicsTests : IDisposable
         using (var db = _database.CreateContext())
         {
             var sessions = new ReviewSessionService(db, clock, TestOptions.Default);
-            var session = (await sessions.StartOrResumeAsync(Trigonometry)).Value!;
+            var session = (await sessions.StartOrResumeAsync(SeedData.DemoStudentId, Trigonometry)).Value!;
             foreach (var question in session.Questions)
             {
-                await sessions.SubmitAnswerAsync(session.SessionId, new SubmitAnswerRequest(question.Id, 0));
+                await sessions.SubmitAnswerAsync(SeedData.DemoStudentId, session.SessionId, new SubmitAnswerRequest(question.Id, 0));
             }
-            Assert.Equal(200, (await sessions.CompleteAsync(session.SessionId)).StatusCode);
+            Assert.Equal(200, (await sessions.CompleteAsync(SeedData.DemoStudentId, session.SessionId)).StatusCode);
         }
         Assert.Equal(1, await CountAt(Now));
 
-        using (var db = _database.CreateContext()) await DemoReset.ResetAsync(db, Now);
+        using (var db = _database.CreateContext()) await DemoReset.ResetAsync(db, DemoGroup.Yks, Now);
 
         Assert.Equal(0, await CountAt(Now));
     }

@@ -31,6 +31,7 @@ public sealed record WeeklySummaryTopic(
     string TopicId,
     string Title,
     string Category,
+    string? UnitName,
     int ReviewCount,
     DateTimeOffset LastCompletedAt,
     int? CorrectCount,
@@ -57,7 +58,7 @@ public static class WeeklySummaryQuery
         var topics = await db.Topics
             .AsNoTracking()
             .Where(topic => topicIds.Contains(topic.Id))
-            .Select(topic => new { topic.Id, topic.Title, topic.Category })
+            .Select(topic => new { topic.Id, topic.Title, topic.Category, topic.UnitName })
             .ToDictionaryAsync(topic => topic.Id, cancellationToken);
 
         var firstDate = ReviewWeek.LocalDate(ReviewWeek.Bounds(now).Start);
@@ -75,7 +76,7 @@ public static class WeeklySummaryQuery
                         var score = scores.GetValueOrDefault(latest.SessionId);
                         var topic = topics[group.Key];
                         return new WeeklySummaryTopic(
-                            group.Key, topic.Title, topic.Category, group.Count(), latest.CompletedAt,
+                            group.Key, topic.Title, topic.Category, topic.UnitName, group.Count(), latest.CompletedAt,
                             score?.CorrectCount, score?.TotalQuestions);
                     })
                     .OrderByDescending(topic => topic.LastCompletedAt)

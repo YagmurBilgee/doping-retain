@@ -23,6 +23,8 @@ interface NavItem {
   /* Tile gradient (top-left → bottom-right), sampled from the Doping Hafıza web sidebar. */
   tile: [from: string, to: string]
   submenu?: string[]
+  /* Shown only in the YKS (12th grade) view */
+  yksOnly?: boolean
 }
 
 /* Order, labels and tile colors follow the Doping Hafıza web sidebar. */
@@ -42,7 +44,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   { label: 'Yardım Merkezi', icon: CircleHelp, tile: ['#57b194', '#4ca189'] },
   { label: 'Canlı Etkinlikler', icon: Video, tile: ['#d14d4f', '#bb3f44'] },
-  { label: 'YKS Butik', icon: UsersRound, tile: ['#5965f5', '#7e89f2'] },
+  { label: 'YKS Butik', icon: UsersRound, tile: ['#5965f5', '#7e89f2'], yksOnly: true },
   { label: 'Testimonial', icon: CirclePlay, tile: ['#64bdf4', '#5590e9'] },
 ]
 
@@ -92,16 +94,18 @@ function NavGroup({ item }: { item: NavItem & { submenu: string[] } }) {
 
 interface SidebarProps {
   activeLabel?: string
+  /** Hides YKS-only shortcuts in other grades */
+  hideYksShortcuts?: boolean
 }
 
-function Sidebar({ activeLabel = 'Ana Sayfa' }: SidebarProps) {
+function Sidebar({ activeLabel = 'Ana Sayfa', hideYksShortcuts = false }: SidebarProps) {
   return (
     <aside className="sidebar sticky top-0 hidden h-screen shrink-0 overflow-y-auto lg:flex">
       <Logo className="sidebar-logo" />
 
       <nav aria-label="Ana menü">
         <ul className="sidebar-list">
-          {NAV_ITEMS.map((item) => {
+          {NAV_ITEMS.filter((item) => !(hideYksShortcuts && item.yksOnly)).map((item) => {
             if (item.submenu) return <NavGroup key={item.label} item={{ ...item, submenu: item.submenu }} />
 
             const isActive = item.label === activeLabel

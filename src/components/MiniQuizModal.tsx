@@ -6,6 +6,8 @@ import ModalShell from './ModalShell'
 import QuizResultView from './QuizResultView'
 
 interface MiniQuizModalProps {
+  /** Owner of the session; every request names this student, so a sent request never moves to another one */
+  studentId: string
   /** Session started by an explicit user action; mount this component per session. */
   session: ReviewSession
   topicTitle: string
@@ -112,7 +114,7 @@ function quizReducer(state: QuizState, action: QuizAction): QuizState {
 
 const OPTION_LETTERS = ['A', 'B', 'C', 'D', 'E']
 
-function MiniQuizModal({ session, topicTitle, variant = 'review', onClose, onCompleted }: MiniQuizModalProps) {
+function MiniQuizModal({ studentId, session, topicTitle, variant = 'review', onClose, onCompleted }: MiniQuizModalProps) {
   const [state, dispatch] = useReducer(quizReducer, session, initQuiz)
   // One request at a time; a ref so a double click cannot slip in before the next render.
   const inFlight = useRef(false)
@@ -158,7 +160,7 @@ function MiniQuizModal({ session, topicTitle, variant = 'review', onClose, onCom
   const answer = (option: number) =>
     send(
       'answer',
-      (signal) => submitAnswer(sessionId, question.id, option, signal),
+      (signal) => submitAnswer(studentId, sessionId, question.id, option, signal),
       (feedback) => dispatch({ type: 'answered', sessionId, feedback }),
       option,
     )
@@ -169,7 +171,7 @@ function MiniQuizModal({ session, topicTitle, variant = 'review', onClose, onCom
       'complete',
       (signal) => {
         completionSent.current = true
-        return completeReviewSession(sessionId, signal)
+        return completeReviewSession(studentId, sessionId, signal)
       },
       (outcome) => {
         dispatch({ type: 'completed', sessionId, outcome })
@@ -180,7 +182,7 @@ function MiniQuizModal({ session, topicTitle, variant = 'review', onClose, onCom
   const restart = () =>
     send(
       'restart',
-      (signal) => startReviewSession(topicId, signal),
+      (signal) => startReviewSession(studentId, topicId, signal),
       (next) => {
         completionSent.current = false
         dispatch({ type: 'restarted', session: next })

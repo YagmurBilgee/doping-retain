@@ -72,7 +72,8 @@ public sealed class ReviewSessionServiceTests : IDisposable
     {
         using (var db = _database.CreateContext())
         {
-            db.Topics.Add(new Topic { Id = "no-quiz", Title = "No quiz", Category = "Test", SortOrder = 100 });
+            db.Topics.Add(new Topic { Id = "no-quiz", Title = "No quiz", Category = "Test", Group = DemoGroup.Yks, SortOrder = 100 });
+            db.StudentTopicStates.Add(new StudentTopicState { StudentId = SeedData.DemoStudentId, TopicId = "no-quiz" });
             db.SaveChanges();
         }
 
@@ -242,7 +243,7 @@ public sealed class ReviewSessionServiceTests : IDisposable
     private async Task<ServiceResult<ReviewSessionResponse>> Start(string topicId = Trigonometry, params IInterceptor[] interceptors)
     {
         using var db = _database.CreateContext(interceptors);
-        return await new ReviewSessionService(db, Clock, TestOptions.Default).StartOrResumeAsync(topicId);
+        return await new ReviewSessionService(db, Clock, TestOptions.Default).StartOrResumeAsync(SeedData.DemoStudentId, topicId);
     }
 
     private Task<ServiceResult<AnswerFeedbackDto>> Answer(
@@ -253,7 +254,7 @@ public sealed class ReviewSessionServiceTests : IDisposable
         Guid sessionId, SubmitAnswerRequest request, params IInterceptor[] interceptors)
     {
         using var db = _database.CreateContext(interceptors);
-        return await new ReviewSessionService(db, Clock, TestOptions.Default).SubmitAnswerAsync(sessionId, request);
+        return await new ReviewSessionService(db, Clock, TestOptions.Default).SubmitAnswerAsync(SeedData.DemoStudentId, sessionId, request);
     }
 
     private int CountRows<T>(Func<AppDbContext, IQueryable<T>> table)

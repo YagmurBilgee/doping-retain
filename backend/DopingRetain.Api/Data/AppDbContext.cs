@@ -11,13 +11,28 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<ReviewSession> ReviewSessions => Set<ReviewSession>();
     public DbSet<SessionAnswer> SessionAnswers => Set<SessionAnswer>();
     public DbSet<TestResult> TestResults => Set<TestResult>();
+    public DbSet<NormalTestQuestion> NormalTestQuestions => Set<NormalTestQuestion>();
+    public DbSet<NormalTestAnswer> NormalTestAnswers => Set<NormalTestAnswer>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Topic>()
-            .HasMany(topic => topic.Questions)
-            .WithOne()
-            .HasForeignKey(question => question.TopicId);
+        modelBuilder.Entity<Student>().Property(s => s.Group).HasConversion<string>();
+
+        modelBuilder.Entity<Topic>(topic =>
+        {
+            topic.Property(t => t.Group).HasConversion<string>();
+            topic.HasMany(t => t.Questions).WithOne().HasForeignKey(question => question.TopicId);
+        });
+
+        modelBuilder.Entity<NormalTestQuestion>()
+            .HasOne<Topic>().WithMany().HasForeignKey(question => question.TopicId);
+
+        modelBuilder.Entity<NormalTestAnswer>(answer =>
+        {
+            // The key makes each question answered once per result.
+            answer.HasKey(a => new { a.TestResultId, a.QuestionId });
+            answer.HasOne<NormalTestQuestion>().WithMany().HasForeignKey(a => a.QuestionId);
+        });
 
         modelBuilder.Entity<StudentTopicState>(state =>
         {
@@ -53,6 +68,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             result.HasOne<Student>().WithMany().HasForeignKey(r => r.StudentId);
             result.HasOne<Topic>().WithMany().HasForeignKey(r => r.TopicId);
             result.HasOne<ReviewSession>().WithMany().HasForeignKey(r => r.ReviewSessionId);
+            result.HasMany(r => r.NormalTestAnswers).WithOne().HasForeignKey(a => a.TestResultId);
             // One stored result per completed review, however often completion is retried.
             result.HasIndex(r => r.ReviewSessionId).IsUnique();
             result.HasIndex(r => new { r.StudentId, r.TopicId });

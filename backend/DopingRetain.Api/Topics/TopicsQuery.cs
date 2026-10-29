@@ -24,10 +24,12 @@ public sealed record TopicsResponse(
 /// (ReviewSchedulePolicy); the test's completion for support_needed.
 /// </param>
 /// <param name="LastReviewedAt">Completion of the latest reminder + mini quiz review; normal tests never set it.</param>
+/// <param name="UnitName">Curriculum unit, shown with titles that repeat across units; null for YKS topics.</param>
 public sealed record TopicSummaryDto(
     string Id,
     string Title,
     string Category,
+    string? UnitName,
     ReviewStatus ReviewStatus,
     TestResultDto? LatestTest,
     DateTimeOffset? NextReviewAt,
@@ -41,6 +43,7 @@ public sealed record TopicDetailResponse(
     string Id,
     string Title,
     string Category,
+    string? UnitName,
     ReviewStatus ReviewStatus,
     TestResultDto? LatestTest,
     DateTimeOffset? NextReviewAt,
@@ -93,6 +96,7 @@ public static class TopicsQuery
             summary.Id,
             summary.Title,
             summary.Category,
+            summary.UnitName,
             summary.ReviewStatus,
             summary.LatestTest,
             summary.NextReviewAt,
@@ -112,7 +116,7 @@ public static class TopicsQuery
             .Where(state => state.StudentId == studentId && (topicId == null || state.TopicId == topicId))
             .OrderBy(state => state.Topic.SortOrder)
             .ThenBy(state => state.TopicId)
-            .Select(state => new { state.TopicId, state.Topic.Title, state.Topic.Category, state.LastReviewedAt })
+            .Select(state => new { state.TopicId, state.Topic.Title, state.Topic.Category, state.Topic.UnitName, state.LastReviewedAt })
             .ToListAsync(cancellationToken);
 
         var latestByTopic = await LatestObservations.LoadAsync(db, studentId, topicId, cancellationToken);
@@ -126,6 +130,7 @@ public static class TopicsQuery
                     row.TopicId,
                     row.Title,
                     row.Category,
+                    row.UnitName,
                     estimate.Status,
                     latest is null ? null : TestResultDto.From(latest.Result),
                     estimate.ReviewAt,

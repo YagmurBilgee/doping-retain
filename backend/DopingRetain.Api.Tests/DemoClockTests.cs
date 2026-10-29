@@ -102,6 +102,6 @@ public sealed class DemoClockTests
     private static Dictionary<string, DateTimeOffset> ReadTestDates(TemporaryDatabase database)
     {
         using var db = database.CreateContext();
-        return db.TestResults.ToDictionary(result => result.TopicId, result => result.CompletedAt);
+        return db.TestResults.ToDictionary(result => $"{result.StudentId}|{result.TopicId}", result => result.CompletedAt);
     }
 }

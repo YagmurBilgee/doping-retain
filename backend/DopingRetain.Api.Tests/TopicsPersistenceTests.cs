@@ -77,11 +77,12 @@ public sealed class TopicsPersistenceTests : IDisposable
         using (var db = CreateContext()) SeedData.Initialize(db, SeededAt.AddDays(3));
 
         using var context = CreateContext();
-        Assert.Equal(1, context.Students.Count());
-        Assert.Equal(6, context.Topics.Count());
-        Assert.Equal(18, context.QuizQuestions.Count());
-        Assert.Equal(5, context.StudentTopicStates.Count());
-        Assert.Equal(5, context.TestResults.Count());
+        // YKS + sixth grade: 1 + 5 students, 6 + 8 topics, 18 + 24 quiz questions, 5 + 40 topic states, 5 + 35 results.
+        Assert.Equal(1 + 5, context.Students.Count());
+        Assert.Equal(6 + 8, context.Topics.Count());
+        Assert.Equal(18 + 24, context.QuizQuestions.Count());
+        Assert.Equal(5 + 40, context.StudentTopicStates.Count());
+        Assert.Equal(5 + 35, context.TestResults.Count());
         Assert.Equal(originalDates, ReadTestDates());
     }
 
@@ -181,12 +182,14 @@ public sealed class TopicsPersistenceTests : IDisposable
         using (var db = CreateContext()) SeedData.Initialize(db, SeededAt.AddDays(3));
 
         using var context = CreateContext();
-        Assert.Equal((6, 18), (context.Topics.Count(), context.QuizQuestions.Count()));
+        Assert.Equal((6 + 8, 18 + 24), (context.Topics.Count(), context.QuizQuestions.Count()));
         Assert.All(context.Topics.Include(t => t.Questions).ToList(), topic => Assert.Equal(3, topic.Questions.Count));
         // Only content is added: existing content, results and the student's topics are left as they were.
         Assert.Equal("Edited earlier", context.QuizQuestions.Single(q => q.Id == "trig-q1").Text);
         Assert.Equal(resultsBefore, ReadTestDates());
-        Assert.Equal((3, 3), (context.TestResults.Count(), context.StudentTopicStates.Count()));
+        Assert.Equal((3, 3), (
+            context.TestResults.Count(r => r.StudentId == SeedData.DemoStudentId),
+            context.StudentTopicStates.Count(s => s.StudentId == SeedData.DemoStudentId)));
     }
 
     [Fact]
@@ -245,6 +248,8 @@ public sealed class TopicsPersistenceTests : IDisposable
     private Dictionary<string, DateTimeOffset> ReadTestDates()
     {
         using var db = CreateContext();
-        return db.TestResults.ToDictionary(result => result.TopicId, result => result.CompletedAt);
+        return db.TestResults
+            .Where(result => result.StudentId == SeedData.DemoStudentId)
+            .ToDictionary(result => result.TopicId, result => result.CompletedAt);
     }
 }

@@ -17,6 +17,11 @@ export function getStatusPresentation(status: ReviewStatus): StatusPresentation 
   return STATUS_PRESENTATION[status]
 }
 
+/** Subject with the curriculum unit when there is one, e.g. "Türkçe · Dilimizin Zenginliği": topic names repeat across units. */
+export function topicContext({ category, unitName }: { category: string; unitName: string | null }): string {
+  return unitName ? `${category} · ${unitName}` : category
+}
+
 const TEST_TYPE_LABEL: Record<TestType, string> = {
   normal_test: 'Normal test',
   reminder_mini_quiz: 'Tekrar mini testi',
@@ -84,6 +89,60 @@ export function formatTestAge(completedAt: string, referenceIso: string): string
   const days = calendarDaysBetween(completedAt, referenceIso)
   if (days <= 0) return 'bugün'
   return days === 1 ? 'dün' : `${days} gün önce`
+}
+
+const WALL_CLOCK = new Intl.DateTimeFormat('en-CA', {
+  timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+})
+const DATE_TIME_FORMAT = new Intl.DateTimeFormat('tr-TR', {
+  timeZone: TIME_ZONE, day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+})
+
+/** "23 Ekim 2026 12:00" in Istanbul time, whatever the browser's time zone is. */
+export function formatDateTime(iso: string): string {
+  return DATE_TIME_FORMAT.format(new Date(iso))
+}
+
+/** Istanbul wall-clock fields of an instant. */
+function istanbulParts(epochMs: number): Record<'year' | 'month' | 'day' | 'hour' | 'minute', number> {
+  const parts = Object.fromEntries(WALL_CLOCK.formatToParts(new Date(epochMs)).map((part) => [part.type, part.value]))
+  return { year: +parts.year, month: +parts.month, day: +parts.day, hour: +parts.hour, minute: +parts.minute }
+}
+
+/** Istanbul's UTC offset at an instant, in minutes (180 for UTC+3). */
+function istanbulOffsetMinutes(epochMs: number): number {
+  const p = istanbulParts(epochMs)
+  return Math.round((Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute) - Math.floor(epochMs / 60000) * 60000) / 60000)
+}
+
+/** An instant as Istanbul date ("2026-10-23") and time ("12:00") input values. */
+export function toIstanbulInput(iso: string): { date: string; time: string } {
+  const p = istanbulParts(Date.parse(iso))
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return { date: `${p.year}-${pad(p.month)}-${pad(p.day)}`, time: `${pad(p.hour)}:${pad(p.minute)}` }
+}
+
+/**
+ * Istanbul date and time inputs as ISO 8601 with Istanbul's offset, e.g. "2026-10-23T12:00+03:00", the format
+ * the backend requires. Null for incomplete or impossible values.
+ */
+export function fromIstanbulInput(date: string, time: string): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date)
+  const clock = /^(\d{2}):(\d{2})$/.exec(time)
+  if (!match || !clock) return null
+  const [year, month, day, hour, minute] = [+match[1], +match[2], +match[3], +clock[1], +clock[2]]
+  const wall = Date.UTC(year, month - 1, day, hour, minute)
+  const check = new Date(wall)
+  if (check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day || hour > 23 || minute > 59) return null
+
+  // The offset at the resulting instant (computed twice in case the first guess crosses an offset change).
+  let offset = istanbulOffsetMinutes(wall - istanbulOffsetMinutes(wall) * 60000)
+  offset = istanbulOffsetMinutes(wall - offset * 60000)
+  const sign = offset < 0 ? '-' : '+'
+  const abs = Math.abs(offset)
+  const hh = String(Math.floor(abs / 60)).padStart(2, '0')
+  const mm = String(abs % 60).padStart(2, '0')
+  return `${date}T${time}${sign}${hh}:${mm}`
 }
 
 /**

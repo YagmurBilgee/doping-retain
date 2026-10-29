@@ -1,7 +1,7 @@
 import { BrainCircuit, CalendarCheck, RotateCcw, ShieldCheck } from 'lucide-react'
 import type { LoadState, TopicsResponse, TopicSummary } from '../api/types'
 import LatestTestSummary from './LatestTestSummary'
-import { formatDate, getStatusPresentation } from './reviewPresentation'
+import { formatDate, getStatusPresentation, topicContext } from './reviewPresentation'
 
 interface MemoryRiskCardProps {
   /** Backend evaluation of the student's topics */
@@ -122,8 +122,8 @@ function DueTopics({ topics, evaluatedAt, reviewMinutes, onStartReview }: DueTop
           {/* The action shares the title row, so the test summary below gets the full width. */}
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
-              <p className="section-subtitle">{topic.category}</p>
-              <p className="truncate text-sm font-semibold text-ink">{topic.title}</p>
+              <p className="section-subtitle">{topicContext(topic)}</p>
+              <p className="line-clamp-2 text-sm font-semibold text-ink">{topic.title}</p>
             </div>
             <button
               type="button"
@@ -166,8 +166,8 @@ function TopicList({ id, title, topics, evaluatedAt, onOpenTopic }: TopicListPro
               <button type="button" className="list-row block w-full text-left" onClick={() => onOpenTopic?.(listed.id)}>
                 <span className="flex items-start gap-2">
                   <span className="min-w-0 flex-1">
-                    <span className="section-subtitle block">{listed.category}</span>
-                    <span className="block truncate text-sm font-semibold text-ink">{listed.title}</span>
+                    <span className="section-subtitle block">{topicContext(listed)}</span>
+                    <span className="line-clamp-2 block text-sm font-semibold text-ink">{listed.title}</span>
                   </span>
                   <span className={`badge ${status.badge} shrink-0`}>{status.label}</span>
                 </span>

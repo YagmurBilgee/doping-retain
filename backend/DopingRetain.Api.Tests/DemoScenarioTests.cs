@@ -56,7 +56,7 @@ public sealed class DemoScenarioTests
         using (var db = database.CreateContext()) SeedData.Initialize(db, now.AddDays(-7));
         await CompleteReview(database, Trigonometry, correctCount: 3, at: now.AddDays(-7));
 
-        using (var db = database.CreateContext()) await DemoReset.ResetAsync(db, now);
+        using (var db = database.CreateContext()) await DemoReset.ResetAsync(db, DemoGroup.Yks, now);
 
         AssertScenario(await GetTopics(database, now), now);
     }
@@ -76,7 +76,7 @@ public sealed class DemoScenarioTests
             db.SaveChanges();
         }
 
-        using (var db = database.CreateContext()) await DemoReset.ResetAsync(db, now);
+        using (var db = database.CreateContext()) await DemoReset.ResetAsync(db, DemoGroup.Yks, now);
 
         AssertScenario(await GetTopics(database, now), now);
         using var check = database.CreateContext();
@@ -168,13 +168,13 @@ public sealed class DemoScenarioTests
     {
         using var db = database.CreateContext();
         var sessions = new ReviewSessionService(db, DemoClock.Create(at.ToString("O"), isDevelopment: true), TestOptions.Default);
-        var session = (await sessions.StartOrResumeAsync(topicId)).Value!;
+        var session = (await sessions.StartOrResumeAsync(SeedData.DemoStudentId, topicId)).Value!;
         var answers = CorrectAnswers.GetValueOrDefault(topicId, [0, 0, 0]);
         foreach (var (question, index) in session.Questions.Select((question, index) => (question, index)))
         {
             var selected = index < correctCount ? answers[index] : (answers[index] + 1) % 4;
-            await sessions.SubmitAnswerAsync(session.SessionId, new SubmitAnswerRequest(question.Id, selected));
+            await sessions.SubmitAnswerAsync(SeedData.DemoStudentId, session.SessionId, new SubmitAnswerRequest(question.Id, selected));
         }
-        Assert.Equal(200, (await sessions.CompleteAsync(session.SessionId)).StatusCode);
+        Assert.Equal(200, (await sessions.CompleteAsync(SeedData.DemoStudentId, session.SessionId)).StatusCode);
     }
 }

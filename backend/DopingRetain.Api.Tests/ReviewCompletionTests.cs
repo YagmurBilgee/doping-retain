@@ -251,7 +251,7 @@ public sealed class ReviewCompletionTests : IDisposable
         using var check = _database.CreateContext();
         Assert.Equal(0, check.Database.SqlQuery<int>(
             $"SELECT COUNT(*) AS Value FROM sqlite_master WHERE name = 'TestResults'").Single());
-        Assert.Equal(5, check.StudentTopicStates.Count());
+        Assert.Equal(5, check.StudentTopicStates.Count(state => state.StudentId == SeedData.DemoStudentId));
     }
 
     private async Task<Guid> StartAndAnswer(int correctCount, int answerCount = 3, TemporaryDatabase? database = null)
@@ -260,7 +260,7 @@ public sealed class ReviewCompletionTests : IDisposable
         Guid sessionId;
         using (var db = database.CreateContext())
         {
-            sessionId = (await new ReviewSessionService(db, ClockAt(Now), TestOptions.Default).StartOrResumeAsync(Trigonometry)).Value!.SessionId;
+            sessionId = (await new ReviewSessionService(db, ClockAt(Now), TestOptions.Default).StartOrResumeAsync(SeedData.DemoStudentId, Trigonometry)).Value!.SessionId;
         }
 
         foreach (var (question, index) in Questions.Take(answerCount).Select((question, index) => (question, index)))
@@ -275,14 +275,14 @@ public sealed class ReviewCompletionTests : IDisposable
         Guid sessionId, DateTimeOffset? at = null, TemporaryDatabase? database = null)
     {
         using var db = (database ?? _database).CreateContext();
-        return await new ReviewSessionService(db, ClockAt(at ?? Now), TestOptions.Default).CompleteAsync(sessionId);
+        return await new ReviewSessionService(db, ClockAt(at ?? Now), TestOptions.Default).CompleteAsync(SeedData.DemoStudentId, sessionId);
     }
 
     private async Task<ServiceResult<AnswerFeedbackDto>> Answer(
         Guid sessionId, string questionId, int selectedIndex, IInterceptor? interceptor = null, TemporaryDatabase? database = null)
     {
         using var db = interceptor is null ? (database ?? _database).CreateContext() : _database.CreateContext(interceptor);
-        return await new ReviewSessionService(db, ClockAt(Now), TestOptions.Default).SubmitAnswerAsync(sessionId, new SubmitAnswerRequest(questionId, selectedIndex));
+        return await new ReviewSessionService(db, ClockAt(Now), TestOptions.Default).SubmitAnswerAsync(SeedData.DemoStudentId, sessionId, new SubmitAnswerRequest(questionId, selectedIndex));
     }
 
     /// <summary>Every persisted value completion may write: review dates, test results and session completion fields.</summary>

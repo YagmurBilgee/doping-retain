@@ -29,8 +29,8 @@ interface NavItem {
 
 /* Order, labels and tile colors follow the Doping Hafıza web sidebar. */
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Dersler', icon: BookOpen, tile: ['#dfa565', '#d09352'] },
   { label: 'Ana Sayfa', icon: LayoutGrid, tile: ['#8898e8', '#7284d7'] },
+  { label: 'Dersler', icon: BookOpen, tile: ['#dfa565', '#d09352'] },
   { label: 'Testler ve Denemeler', icon: FileCheck, tile: ['#6fd192', '#6dc08d'] },
   { label: 'WAY Evreni', icon: '/images/way-bird.png', tile: ['#c5caf9', '#c5caf9'] },
   { label: 'Rehberlik Videoları', icon: SquareMousePointer, tile: ['#80c6e2', '#71b5d2'] },
@@ -45,7 +45,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Yardım Merkezi', icon: CircleHelp, tile: ['#57b194', '#4ca189'] },
   { label: 'Canlı Etkinlikler', icon: Video, tile: ['#d14d4f', '#bb3f44'] },
   { label: 'YKS Butik', icon: UsersRound, tile: ['#5965f5', '#7e89f2'], yksOnly: true },
-  { label: 'Testimonial', icon: CirclePlay, tile: ['#64bdf4', '#5590e9'] },
+  { label: 'Öğrencilerimizden Dinleyin', icon: CirclePlay, tile: ['#64bdf4', '#5590e9'] },
 ]
 
 function NavTile({ icon: Icon, tile: [from, to] }: NavItem) {

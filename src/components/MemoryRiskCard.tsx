@@ -1,7 +1,8 @@
-import { BrainCircuit, CalendarCheck, RotateCcw, ShieldCheck } from 'lucide-react'
+import { useId, useState } from 'react'
+import { BrainCircuit, CalendarCheck, ChevronDown, RotateCcw, ShieldCheck } from 'lucide-react'
 import type { LoadState, TopicsResponse, TopicSummary } from '../api/types'
 import LatestTestSummary from './LatestTestSummary'
-import { formatDate, getStatusPresentation, topicContext } from './reviewPresentation'
+import { formatDate, topicContext } from './reviewPresentation'
 
 interface MemoryRiskCardProps {
   /** Backend evaluation of the student's topics */
@@ -31,8 +32,8 @@ function MemoryRiskCard({
   const noDataTopics = data?.topics.filter(({ reviewStatus }) => reviewStatus === 'insufficient_data') ?? []
 
   return (
-    <section className="card" aria-labelledby="memory-risk-title" aria-busy={topics.status === 'loading'}>
-      <header className="mb-4 flex items-start justify-between gap-3">
+    <section className="card p-4" aria-labelledby="memory-risk-title" aria-busy={topics.status === 'loading'}>
+      <header className="mb-3 flex items-start justify-between gap-3">
         <div>
           <h2 id="memory-risk-title" className="section-title">
             Dopingle Hatırla
@@ -76,11 +77,11 @@ function MemoryRiskCard({
         ))}
 
       {data && supportTopics.length > 0 && (
-        <TopicList id="support-topics-title" title="Pekiştirme Önerilen Konular" topics={supportTopics} evaluatedAt={data.evaluatedAt} onOpenTopic={onStartReinforcement} />
+        <TopicList title="Pekiştirme Önerilen Konular" topics={supportTopics} evaluatedAt={data.evaluatedAt} onOpenTopic={onStartReinforcement} />
       )}
 
       {data && noDataTopics.length > 0 && (
-        <TopicList id="no-data-topics-title" title="Test Sonucu Bekleyen Konular" topics={noDataTopics} evaluatedAt={data.evaluatedAt} onOpenTopic={onStartReview} />
+        <TopicList title="Test Sonucu Bekleyen Konular" topics={noDataTopics} evaluatedAt={data.evaluatedAt} onOpenTopic={onStartReview} />
       )}
 
       {/* Only from a loaded response, so loading or errors never show a made-up zero. */}
@@ -92,7 +93,7 @@ function MemoryRiskCard({
 /** Secondary footer with the server's weekly count of distinct reviewed topics and the weekly summary button. */
 function WeeklyReviews({ count, onOpenSummary }: { count: number; onOpenSummary?: () => void }) {
   return (
-    <div className="mt-4 flex items-center gap-2 border-t border-line pt-3">
+    <div className="mt-3 flex items-center gap-2 border-t border-line pt-3">
       <p className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-ink-muted">
         <CalendarCheck size={14} className="shrink-0" aria-hidden="true" />
         {count > 0 ? `Bu hafta ${count} farklı konuyu tekrar ettin.` : 'Bu haftaki ilk tekrarını yapmaya hazır mısın?'}
@@ -118,11 +119,13 @@ function DueTopics({ topics, evaluatedAt, reviewMinutes, onStartReview }: DueTop
   return (
     <ul className="flex flex-col gap-2">
       {topics.map((topic) => (
-        <li key={topic.id} className="list-row block">
+        <li key={topic.id} className="list-row block p-3">
           {/* The action shares the title row, so the test summary below gets the full width. */}
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
-              <p className="section-subtitle">{topicContext(topic)}</p>
+              <p className="section-subtitle truncate" title={topicContext(topic)}>
+                {topicContext(topic)}
+              </p>
               <p className="line-clamp-2 text-sm font-semibold text-ink">{topic.title}</p>
             </div>
             <button
@@ -144,43 +147,59 @@ function DueTopics({ topics, evaluatedAt, reviewMinutes, onStartReview }: DueTop
 }
 
 interface TopicListProps {
-  id: string
   title: string
   topics: TopicSummary[]
   evaluatedAt: string
   onOpenTopic?: (topicId: string) => void
 }
 
-/** Topics listed below the due topics; they are never counted as due. */
-function TopicList({ id, title, topics, evaluatedAt, onOpenTopic }: TopicListProps) {
+/**
+ * Topics listed below the due topics; they are never counted as due. A disclosure, collapsed at first, so the
+ * due topics stay in view; the heading names the list and its count, so rows carry no repeated status badge.
+ */
+function TopicList({ title, topics, evaluatedAt, onOpenTopic }: TopicListProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const listId = useId()
+
   return (
-    <section className="mt-5 border-t border-line pt-4" aria-labelledby={id}>
-      <h3 id={id} className="text-sm font-semibold text-ink">
-        {title}
+    <section className="mt-3 border-t border-line pt-3">
+      <h3>
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 rounded-tile py-1 text-left text-sm font-semibold text-ink hover:text-brand focus-visible:outline-2 focus-visible:outline-brand"
+          aria-expanded={isOpen}
+          aria-controls={listId}
+          onClick={() => setIsOpen((open) => !open)}
+        >
+          <span className="min-w-0 flex-1">{title}</span>
+          <span className="badge badge-brand">
+            {topics.length}
+            <span className="sr-only"> konu</span>
+          </span>
+          <ChevronDown
+            size={16}
+            className={`shrink-0 text-ink-secondary transition-transform ${isOpen ? 'rotate-180' : ''}`}
+            aria-hidden="true"
+          />
+        </button>
       </h3>
-      <ul className="mt-2 flex flex-col gap-2">
-        {topics.map((listed) => {
-          const status = getStatusPresentation(listed.reviewStatus)
-          return (
-            <li key={listed.id}>
-              <button type="button" className="list-row block w-full text-left" onClick={() => onOpenTopic?.(listed.id)}>
-                <span className="flex items-start gap-2">
-                  <span className="min-w-0 flex-1">
-                    <span className="section-subtitle block">{topicContext(listed)}</span>
-                    <span className="line-clamp-2 block text-sm font-semibold text-ink">{listed.title}</span>
-                  </span>
-                  <span className={`badge ${status.badge} shrink-0`}>{status.label}</span>
+      <ul id={listId} className="mt-2 flex flex-col gap-2" hidden={!isOpen}>
+        {topics.map((listed) => (
+          <li key={listed.id}>
+            <button type="button" className="list-row block w-full p-3 text-left" onClick={() => onOpenTopic?.(listed.id)}>
+              <span className="section-subtitle block truncate" title={topicContext(listed)}>
+                {topicContext(listed)}
+              </span>
+              <span className="line-clamp-2 block text-sm font-semibold text-ink">{listed.title}</span>
+              {/* Without a test the list heading already says so. */}
+              {listed.latestTest && (
+                <span className="mt-1 block">
+                  <LatestTestSummary test={listed.latestTest} evaluatedAt={evaluatedAt} />
                 </span>
-                {/* Without a test the status badge already says so. */}
-                {listed.latestTest && (
-                  <span className="mt-1 block">
-                    <LatestTestSummary test={listed.latestTest} evaluatedAt={evaluatedAt} />
-                  </span>
-                )}
-              </button>
-            </li>
-          )
-        })}
+              )}
+            </button>
+          </li>
+        ))}
       </ul>
     </section>
   )

@@ -147,7 +147,7 @@ function HomePage({
     <div className="flex flex-1">
       <Sidebar hideYksShortcuts={isSixthGrade} />
 
-      <div className="flex min-w-0 flex-1 flex-col gap-[26px] px-4 py-6 sm:px-7 sm:pt-9">
+      <div className="flex min-w-0 flex-1 flex-col gap-6 px-4 py-6 sm:px-5 sm:pt-8">
         <TopBar
           group={group}
           onSelectGroup={onSelectGroup}
@@ -158,7 +158,8 @@ function HomePage({
           onOpenDemoPanel={onOpenDemoPanel}
         />
 
-        <div className="grid grid-cols-1 gap-7 xl:grid-cols-[minmax(0,1fr)_344px]">
+        {/* The right column grows with the viewport but stays wide enough for the Dopingle Hatırla rows. */}
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_clamp(19rem,22vw,22.5rem)]">
           <main className="flex min-w-0 flex-col gap-6">
             <div className="flex flex-col gap-[11px] sm:flex-row">
               <ProfileBanner name={student?.displayName} showDecorativeScores={!isSixthGrade} />
@@ -171,9 +172,11 @@ function HomePage({
             </div>
           </main>
 
-          <aside className="flex flex-col gap-6" aria-label="Günlük plan">
-            <JourneyCard group={group} />
+          <aside className="flex min-w-0 flex-col gap-5" aria-label="Günlük plan">
+            {!isSixthGrade && <JourneyCard />}
             <MiniCalendar />
+            {/* The product's place for the daily program: right below the calendar. */}
+            <DailyProgram group={group} />
             <MemoryRiskCard
               topics={topicsView}
               onRetry={studentId ? reloadTopics : onRetryStudents}
@@ -181,7 +184,6 @@ function HomePage({
               onStartReinforcement={(topicId) => openDetail(topicId, 'reinforcement')}
               onOpenWeeklySummary={() => setIsWeeklySummaryOpen(true)}
             />
-            <DailyProgram group={group} />
             {demoEnabled && (
               <DemoResetButton
                 label={`Demoyu Sıfırla (${gradeOption(group).shortLabel})`}

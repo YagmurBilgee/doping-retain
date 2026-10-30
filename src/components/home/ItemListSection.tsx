@@ -15,13 +15,13 @@ interface ItemListSectionProps {
   actionIcon: LucideIcon
 }
 
-/** Shared "section title + list-row card" pattern used across the home screen. */
+/** Shared "white panel with its title + list rows" pattern used across the home screen. */
 function ItemListSection({ title, subtitle, items, actionIcon: ActionIcon }: ItemListSectionProps) {
   return (
-    <section>
+    <section className="card">
       <h2 className="section-title">{title}</h2>
       {subtitle && <p className="section-subtitle mt-0.5">{subtitle}</p>}
-      <ul className="card mt-3 flex flex-col gap-2">
+      <ul className="mt-3 flex flex-col gap-2">
         {items.map(({ category, title: itemTitle, meta, icon: Icon, tint }) => (
           <li key={itemTitle} className="list-row">
             <span className={`icon-tile ${tint}`} aria-hidden="true">

@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using DopingRetain.Api.Data;
 using DopingRetain.Api.Memory;
+using DopingRetain.Api.Students;
 using DopingRetain.Api.TestResults;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -9,14 +10,14 @@ using Microsoft.EntityFrameworkCore;
 namespace DopingRetain.Api.Reviews;
 
 /// <summary>
-/// Starts or resumes the demo student's review sessions, records answers and completes reviews.
-/// Starting and answering never write test results or review dates; only completion does.
+/// Starts or resumes a student's review sessions, records answers and completes reviews. Every operation names
+/// its student; a session is only visible to the student who owns it. Starting and answering never write test
+/// results or review dates; only completion does.
 /// </summary>
 public sealed class ReviewSessionService(
     AppDbContext db, TimeProvider clock, RetentionModelOptions options, ReviewScheduleOptions? schedule = null)
 {
     private readonly ReviewScheduleOptions scheduleOptions = schedule ?? new ReviewScheduleOptions();
-    private const string StudentId = SeedData.DemoStudentId;
     private const int SqliteUniqueViolation = 2067; // SQLITE_CONSTRAINT_UNIQUE
     private const int SqlitePrimaryKeyViolation = 1555; // SQLITE_CONSTRAINT_PRIMARYKEY
 
@@ -26,12 +27,11 @@ public sealed class ReviewSessionService(
     };
 
     public async Task<ServiceResult<ReviewSessionResponse>> StartOrResumeAsync(
-        string topicId, CancellationToken cancellationToken = default)
+        string studentId, string topicId, CancellationToken cancellationToken = default)
     {
-        if (!await db.Topics.AnyAsync(topic => topic.Id == topicId, cancellationToken))
+        if (await StudentScope.CheckTopicAsync(db, studentId, topicId, cancellationToken) is { } scopeFailure)
         {
-            return ServiceResult<ReviewSessionResponse>.Failure(
-                StatusCodes.Status404NotFound, "topic_not_found", $"Topic '{topicId}' does not exist.");
+            return scopeFailure.As<ReviewSessionResponse>();
         }
 
         var questions = await db.QuizQuestions
@@ -51,11 +51,11 @@ public sealed class ReviewSessionService(
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
         var stateVersion = await db.StudentTopicStates
-            .Where(state => state.StudentId == StudentId && state.TopicId == topicId)
+            .Where(state => state.StudentId == studentId && state.TopicId == topicId)
             .Select(state => state.Version)
             .SingleAsync(cancellationToken);
 
-        var openSession = await FindOpenSessionAsync(topicId, cancellationToken);
+        var openSession = await FindOpenSessionAsync(studentId, topicId, cancellationToken);
         if (openSession is not null && openSession.StateVersionAtStart == stateVersion)
         {
             return ServiceResult<ReviewSessionResponse>.Success(ToResponse(openSession, questions));
@@ -71,7 +71,7 @@ public sealed class ReviewSessionService(
         var session = new ReviewSession
         {
             Id = Guid.NewGuid(),
-            StudentId = StudentId,
+            StudentId = studentId,
             TopicId = topicId,
             Status = ReviewSessionStatus.Open,
             StartedAt = clock.GetUtcNow(),
@@ -85,8 +85,12 @@ public sealed class ReviewSessionService(
     }
 
     public async Task<ServiceResult<AnswerFeedbackDto>> SubmitAnswerAsync(
-        Guid sessionId, SubmitAnswerRequest request, CancellationToken cancellationToken = default)
+        string studentId, Guid sessionId, SubmitAnswerRequest request, CancellationToken cancellationToken = default)
     {
+        if (await StudentScope.CheckStudentAsync(db, studentId, cancellationToken) is { } scopeFailure)
+        {
+            return scopeFailure.As<AnswerFeedbackDto>();
+        }
         if (string.IsNullOrWhiteSpace(request.QuestionId) || request.SelectedIndex is not { } selectedIndex)
         {
             return Failure(StatusCodes.Status400BadRequest, "invalid_request", "questionId and selectedIndex are required.");
@@ -94,7 +98,7 @@ public sealed class ReviewSessionService(
 
         var session = await db.ReviewSessions
             .AsNoTracking()
-            .SingleOrDefaultAsync(s => s.Id == sessionId && s.StudentId == StudentId, cancellationToken);
+            .SingleOrDefaultAsync(s => s.Id == sessionId && s.StudentId == studentId, cancellationToken);
         if (session is null) return SessionNotFound<AnswerFeedbackDto>(sessionId);
         if (session.Status == ReviewSessionStatus.Abandoned) return SessionAbandoned<AnswerFeedbackDto>();
 
@@ -129,15 +133,20 @@ public sealed class ReviewSessionService(
     /// A completed session returns its stored outcome without recalculating or storing anything.
     /// </summary>
     public async Task<ServiceResult<ReviewCompletionResponse>> CompleteAsync(
-        Guid sessionId, CancellationToken cancellationToken = default)
+        string studentId, Guid sessionId, CancellationToken cancellationToken = default)
     {
+        if (await StudentScope.CheckStudentAsync(db, studentId, cancellationToken) is { } scopeFailure)
+        {
+            return scopeFailure.As<ReviewCompletionResponse>();
+        }
+
         // Microsoft.Data.Sqlite begins EF transactions with BEGIN IMMEDIATE, taking the write lock up front:
         // completions and answer inserts run one at a time, and the reads below see the latest commit.
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
         var session = await db.ReviewSessions
             .Include(s => s.Answers)
-            .SingleOrDefaultAsync(s => s.Id == sessionId && s.StudentId == StudentId, cancellationToken);
+            .SingleOrDefaultAsync(s => s.Id == sessionId && s.StudentId == studentId, cancellationToken);
         if (session is null) return SessionNotFound<ReviewCompletionResponse>(sessionId);
         if (session.OutcomeJson is not null)
         {
@@ -162,16 +171,16 @@ public sealed class ReviewSessionService(
 
         var state = await db.StudentTopicStates
             .Include(s => s.Topic)
-            .SingleAsync(s => s.StudentId == StudentId && s.TopicId == session.TopicId, cancellationToken);
+            .SingleAsync(s => s.StudentId == studentId && s.TopicId == session.TopicId, cancellationToken);
 
         var now = clock.GetUtcNow();
         // The schedule in effect just before this quiz, read inside the same transaction.
-        var previous = (await LatestObservations.LoadAsync(db, StudentId, session.TopicId, cancellationToken))
+        var previous = (await LatestObservations.LoadAsync(db, studentId, session.TopicId, cancellationToken))
             .GetValueOrDefault(session.TopicId);
         var score = session.Answers.Count(answer => answer.IsCorrect);
         var testResult = new TestResult
         {
-            StudentId = StudentId,
+            StudentId = studentId,
             TopicId = session.TopicId,
             TestType = TestType.ReminderMiniQuiz,
             CompletedAt = now,
@@ -267,11 +276,11 @@ public sealed class ReviewSessionService(
         return await FindAnswerAsync(sessionId, question.Id, cancellationToken);
     }
 
-    private Task<ReviewSession?> FindOpenSessionAsync(string topicId, CancellationToken cancellationToken) =>
+    private Task<ReviewSession?> FindOpenSessionAsync(string studentId, string topicId, CancellationToken cancellationToken) =>
         db.ReviewSessions
             .Include(session => session.Answers)
             .SingleOrDefaultAsync(
-                session => session.StudentId == StudentId
+                session => session.StudentId == studentId
                     && session.TopicId == topicId
                     && session.Status == ReviewSessionStatus.Open,
                 cancellationToken);
@@ -326,7 +335,7 @@ public sealed class ReviewSessionService(
 
     private static ServiceResult<T> SessionNotFound<T>(Guid sessionId) =>
         ServiceResult<T>.Failure(StatusCodes.Status404NotFound, "session_not_found",
-            $"Review session '{sessionId}' does not exist. A demo reset removes all sessions.");
+            $"Review session '{sessionId}' does not exist for this student. A demo reset or edit removes sessions.");
 
     private static ServiceResult<T> SessionAbandoned<T>() =>
         ServiceResult<T>.Failure(StatusCodes.Status409Conflict, "session_abandoned",

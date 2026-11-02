@@ -1,5 +1,6 @@
 using DopingRetain.Api.Data;
 using DopingRetain.Api.Reviews;
+using DopingRetain.Api.Students;
 using Microsoft.EntityFrameworkCore;
 
 namespace DopingRetain.Api.TestResults;
@@ -21,16 +22,14 @@ public sealed record RecordTestResultRequest(int? CorrectCount, int? TotalQuesti
 public sealed record RecordedTestResultResponse(TestResultDto Result, bool IsLatest);
 
 /// <summary>
-/// Records a topic-level normal test result for the demo student. DEMO INTEGRATION CONTRACT: a minimal
+/// Records a topic-level normal test result for a student. DEMO INTEGRATION CONTRACT: a minimal
 /// stand-in for a test platform feed, not an existing company integration. It updates the topic's test
 /// observation only; it never completes a review, so LastReviewedAt and the weekly review count stay as they are.
 /// </summary>
 public sealed class TestResultService(AppDbContext db, TimeProvider clock)
 {
-    private const string StudentId = SeedData.DemoStudentId;
-
     public async Task<ServiceResult<RecordedTestResultResponse>> RecordNormalTestAsync(
-        string topicId, RecordTestResultRequest request, CancellationToken cancellationToken = default)
+        string studentId, string topicId, RecordTestResultRequest request, CancellationToken cancellationToken = default)
     {
         if (request is not { CorrectCount: { } correct, TotalQuestions: { } total, CompletedAt: { } completedAt })
         {
@@ -46,14 +45,14 @@ public sealed class TestResultService(AppDbContext db, TimeProvider clock)
         {
             return Failure(StatusCodes.Status400BadRequest, "future_completion", $"completedAt must not be after {now:O}.");
         }
-        if (!await db.StudentTopicStates.AnyAsync(state => state.StudentId == StudentId && state.TopicId == topicId, cancellationToken))
+        if (await StudentScope.CheckTopicAsync(db, studentId, topicId, cancellationToken) is { } scopeFailure)
         {
-            return Failure(StatusCodes.Status404NotFound, "topic_not_found", $"Topic '{topicId}' does not exist.");
+            return scopeFailure.As<RecordedTestResultResponse>();
         }
 
         var result = new TestResult
         {
-            StudentId = StudentId,
+            StudentId = studentId,
             TopicId = topicId,
             TestType = TestType.NormalTest,
             CompletedAt = completedAt.ToUniversalTime(),
@@ -65,7 +64,7 @@ public sealed class TestResultService(AppDbContext db, TimeProvider clock)
 
         var topicResults = await db.TestResults
             .AsNoTracking()
-            .Where(r => r.StudentId == StudentId && r.TopicId == topicId)
+            .Where(r => r.StudentId == studentId && r.TopicId == topicId)
             .ToListAsync(cancellationToken);
 
         return ServiceResult<RecordedTestResultResponse>.Success(

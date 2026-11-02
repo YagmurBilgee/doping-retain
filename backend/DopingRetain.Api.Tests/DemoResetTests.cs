@@ -60,8 +60,9 @@ public sealed class DemoResetTests : IDisposable
 
         using var db = _database.CreateContext();
         Assert.Equal((0, 0), (db.ReviewSessions.Count(), db.SessionAnswers.Count()));
-        Assert.Equal(5, db.TestResults.Count(result => result.TestType == TestType.NormalTest));
-        Assert.Equal((1, 6, 18, 5), (db.Students.Count(), db.Topics.Count(), db.QuizQuestions.Count(), db.StudentTopicStates.Count()));
+        Assert.Equal(5, db.TestResults.Count(result => result.StudentId == SeedData.DemoStudentId && result.TestType == TestType.NormalTest));
+        // Content and both groups' students stay: YKS + sixth grade.
+        Assert.Equal((1 + 5, 6 + 8, 18 + 24, 5 + 40), (db.Students.Count(), db.Topics.Count(), db.QuizQuestions.Count(), db.StudentTopicStates.Count()));
         Assert.Equal(new[] { "1/2", "√3/2", "0", "1" }, db.QuizQuestions.Single(q => q.Id == "trig-q1").Options);
     }
 
@@ -73,27 +74,36 @@ public sealed class DemoResetTests : IDisposable
 
         Assert.Equal(FreshSeedMemory(ResetAt), ReadMemory(_database));
         using var db = _database.CreateContext();
-        Assert.All(db.StudentTopicStates, state => Assert.Equal(2, state.Version));
+        Assert.All(db.StudentTopicStates.Where(state => state.StudentId == SeedData.DemoStudentId), state => Assert.Equal(2, state.Version));
     }
 
     [Theory]
-    [InlineData("Development", true)]
-    [InlineData("Production", false)]
-    [InlineData("Staging", false)]
-    public void ResetEndpoint_IsMappedOnlyInDevelopment(string environment, bool mapped)
+    [InlineData("Development", "true", true)]
+    [InlineData("Production", "true", true)]
+    [InlineData("Development", "false", false)]
+    [InlineData("Production", "false", false)]
+    [InlineData("Production", null, false)]
+    public void DemoEndpoints_AreMappedOnlyWhenDemoEnabled(string environment, string? enabled, bool mapped)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = environment });
+        if (enabled is not null) builder.Configuration[DemoEndpoints.EnabledKey] = enabled;
         builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite("Data Source=:memory:"));
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton(TestOptions.Default);
+        builder.Services.AddScoped<DemoEditorService>();
         var app = builder.Build();
 
-        app.MapDemoReset();
+        app.MapDemoEndpoints();
 
         var routes = ((IEndpointRouteBuilder)app).DataSources
             .SelectMany(source => source.Endpoints)
             .OfType<RouteEndpoint>()
-            .Select(endpoint => endpoint.RoutePattern.RawText);
-        Assert.Equal(mapped, routes.Contains(DemoReset.Path));
+            .Select(endpoint => endpoint.RoutePattern.RawText)
+            .ToList();
+        Assert.Equal(mapped, routes.Contains("/api/demo/groups/{group}/reset"));
+        Assert.Equal(mapped, routes.Contains("/api/demo/students/{studentId}/topics/{topicId}/normal-test"));
+        // There is no unscoped reset that could clear both groups.
+        Assert.DoesNotContain("/api/demo/reset", routes);
     }
 
     [Fact]
@@ -158,7 +168,7 @@ public sealed class DemoResetTests : IDisposable
 
         using var db = _database.CreateContext(interceptor);
         var result = await new ReviewSessionService(db, ClockAt(SeededAt), TestOptions.Default)
-            .SubmitAnswerAsync(sessionId, new SubmitAnswerRequest("trig-q3", 1));
+            .SubmitAnswerAsync(SeedData.DemoStudentId, sessionId, new SubmitAnswerRequest("trig-q3", 1));
 
         Assert.True(interceptor.Ran);
         Assert.Equal((404, "session_not_found"), (result.StatusCode, result.Error!.Code));
@@ -201,7 +211,7 @@ public sealed class DemoResetTests : IDisposable
     private async Task<ServiceResult<ReviewSessionResponse>> Start(TemporaryDatabase? database = null)
     {
         using var db = (database ?? _database).CreateContext();
-        return await new ReviewSessionService(db, ClockAt(SeededAt), TestOptions.Default).StartOrResumeAsync(Trigonometry);
+        return await new ReviewSessionService(db, ClockAt(SeededAt), TestOptions.Default).StartOrResumeAsync(SeedData.DemoStudentId, Trigonometry);
     }
 
     private async Task<ServiceResult<AnswerFeedbackDto>> Answer(
@@ -209,19 +219,19 @@ public sealed class DemoResetTests : IDisposable
     {
         using var db = (database ?? _database).CreateContext();
         return await new ReviewSessionService(db, ClockAt(SeededAt), TestOptions.Default)
-            .SubmitAnswerAsync(sessionId, new SubmitAnswerRequest(questionId, selectedIndex));
+            .SubmitAnswerAsync(SeedData.DemoStudentId, sessionId, new SubmitAnswerRequest(questionId, selectedIndex));
     }
 
     private async Task<ServiceResult<ReviewCompletionResponse>> Complete(Guid sessionId, TemporaryDatabase? database = null)
     {
         using var db = (database ?? _database).CreateContext();
-        return await new ReviewSessionService(db, ClockAt(SeededAt), TestOptions.Default).CompleteAsync(sessionId);
+        return await new ReviewSessionService(db, ClockAt(SeededAt), TestOptions.Default).CompleteAsync(SeedData.DemoStudentId, sessionId);
     }
 
     private async Task Reset(DateTimeOffset at, TemporaryDatabase? database = null)
     {
         using var db = (database ?? _database).CreateContext();
-        await DemoReset.ResetAsync(db, at);
+        await DemoReset.ResetAsync(db, DemoGroup.Yks, at);
     }
 
     private void BumpVersion()
@@ -245,19 +255,21 @@ public sealed class DemoResetTests : IDisposable
     }
 
     /// <summary>
-    /// Learning values: review dates and test results. Version is a concurrency token and result Ids are
-    /// insertion order, so neither is a learning value.
+    /// The YKS student's learning values (the scope of a YKS reset): review dates and test results. Version is
+    /// a concurrency token and result Ids are insertion order, so neither is a learning value.
     /// </summary>
     private static List<string> ReadMemory(TemporaryDatabase database)
     {
         using var db = database.CreateContext();
         var states = db.StudentTopicStates
             .AsNoTracking()
+            .Where(state => state.StudentId == SeedData.DemoStudentId)
             .AsEnumerable()
             .OrderBy(state => state.TopicId)
             .Select(state => $"{state.StudentId}|{state.TopicId}|{state.LastReviewedAt:O}");
         var results = db.TestResults
             .AsNoTracking()
+            .Where(result => result.StudentId == SeedData.DemoStudentId)
             .AsEnumerable()
             .OrderBy(result => result.TopicId).ThenBy(result => result.CompletedAt)
             .Select(result => $"{result.StudentId}|{result.TopicId}|{result.TestType}|{result.CompletedAt:O}|" +

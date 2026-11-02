@@ -15,7 +15,9 @@ function JourneyCard() {
         className="absolute inset-0 size-full rounded-card object-cover"
       />
       <div className="relative flex flex-1 flex-col items-start rounded-card bg-linear-to-r from-white/85 via-white/60 via-45% to-transparent to-75% px-3.5 pt-[18px] pb-[22px]">
-        <h2 className="text-2xl leading-tight font-extrabold text-heading">YKS Yolculuğum!</h2>
+        <h2 className="text-2xl leading-tight font-extrabold text-heading">
+          YKS Yolculuğum!
+        </h2>
         <p className="mt-1.5 max-w-60 text-sm leading-[1.55] text-[#282828]">
           Hedefine ulaşman için sana özel hazırlanmış bir yolculuk.
         </p>

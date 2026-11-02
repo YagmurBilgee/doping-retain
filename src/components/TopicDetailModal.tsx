@@ -4,9 +4,11 @@ import { errorMessage, getTopic, isAbort, startReviewSession } from '../api/clie
 import type { LoadState, ReviewSession, TopicDetail } from '../api/types'
 import ModalShell from './ModalShell'
 import ReinforcementSteps from './ReinforcementSteps'
-import { daysSinceTest, formatScore, scheduleText, testTypeLabel } from './reviewPresentation'
+import { daysSinceTest, formatScore, scheduleText, testTypeLabel, topicContext } from './reviewPresentation'
 
 interface TopicDetailModalProps {
+  /** The student the topic is opened for; fixed for this mount */
+  studentId: string
   /** Mount this component per opened topic; unmounting cancels its requests. */
   topicId: string
   /** 'reinforcement' (support-needed list): video and detailed explanations instead of the three recall points */
@@ -16,7 +18,7 @@ interface TopicDetailModalProps {
   onSessionStarted: (session: ReviewSession, topicTitle: string) => void
 }
 
-function TopicDetailModal({ topicId, flow = 'review', onClose, onSessionStarted }: TopicDetailModalProps) {
+function TopicDetailModal({ studentId, topicId, flow = 'review', onClose, onSessionStarted }: TopicDetailModalProps) {
   const [detail, setDetail] = useState<LoadState<TopicDetail>>({ status: 'loading' })
   const [attempt, setAttempt] = useState(0)
   const [start, setStart] = useState<{ pending: boolean; error?: string }>({ pending: false })
@@ -27,14 +29,14 @@ function TopicDetailModal({ topicId, flow = 'review', onClose, onSessionStarted 
 
   useEffect(() => {
     const controller = new AbortController()
-    getTopic(topicId, controller.signal).then(
+    getTopic(studentId, topicId, controller.signal).then(
       (data) => setDetail({ status: 'ready', data }),
       (error: unknown) => {
         if (!controller.signal.aborted) setDetail({ status: 'error', message: errorMessage(error) })
       },
     )
     return () => controller.abort()
-  }, [topicId, attempt])
+  }, [studentId, topicId, attempt])
 
   const retry = () => {
     setDetail({ status: 'loading' })
@@ -49,7 +51,7 @@ function TopicDetailModal({ topicId, flow = 'review', onClose, onSessionStarted 
     setStart({ pending: true })
 
     try {
-      const session = await startReviewSession(topicId, controller.signal)
+      const session = await startReviewSession(studentId, topicId, controller.signal)
       if (!controller.signal.aborted) onSessionStarted(session, topicTitle)
     } catch (error) {
       if (!isAbort(error) && !controller.signal.aborted) setStart({ pending: false, error: errorMessage(error) })
@@ -143,7 +145,7 @@ function TopicDetailContent({ topic, isStarting, startError, onClose, onStartQui
           height={1254}
           className="-mt-2 -mb-1 size-28 object-contain sm:size-[176px] [@media(max-height:760px)]:size-24"
         />
-        <span className="badge badge-brand mt-1">{topic.category}</span>
+        <span className="badge badge-brand mt-1">{topicContext(topic)}</span>
         <h2 id="topic-detail-title" className="mt-2 text-2xl font-bold tracking-tight text-ink sm:text-3xl">
           {topic.title}
         </h2>

@@ -24,8 +24,12 @@
   --color-ink-muted: #9aa0b8;
   /* Arama metni ve koyu profil kartındaki soluk metinler */
   --color-ink-slate: #657a94;
-  /* Panel başlıkları (Duyurular, Son Aktivitelerim) */
-  --color-heading: #303d4e;
+  /* Bölüm başlıkları ve takvim günleri (referans: #2C3E50) */
+  --color-heading: #2c3e50;
+  /* Takvim gün adları */
+  --color-heading-muted: #607b96;
+  /* Takvimde seçili gün */
+  --color-calendar-active: #ff6d43;
 
   /* Marka */
   --color-brand: #2f55d4;
@@ -127,9 +131,13 @@
   @apply flex size-10 shrink-0 items-center justify-center rounded-tile;
 }
 
-/* Başlıklar */
+/*
+ * Başlıklar: referans paneldeki bölüm başlıkları Manrope 600 ve #2C3E50'dir. Referans boyutu kök
+ * yazı boyutuyla (12-14px, viewport genişliği ve yüksekliğine göre) ölçeklenir; burada okunabilir
+ * sabit bir 20px kullanılır.
+ */
 @utility section-title {
-  @apply text-lg font-bold tracking-tight text-ink;
+  @apply font-manrope text-xl leading-tight font-semibold text-heading;
 }
 
 @utility section-subtitle {
@@ -163,9 +171,9 @@
   @apply flex h-13 items-center gap-5 rounded-tile bg-field px-5 font-manrope text-base text-ink;
 }
 
-/* Duyurular ve Son Aktivitelerim: başlık ve beyaz kart */
+/* Duyurular ve Son Aktivitelerim: diğer bölüm başlıklarıyla aynı hiyerarşide başlık ve beyaz kart */
 @utility panel-title {
-  @apply font-manrope text-[26px] font-bold text-heading;
+  @apply section-title;
 }
 
 @utility panel-card {
@@ -187,17 +195,17 @@
 }
 
 /*
- * Kenar çubuğu: ölçüler Doping Hafıza web sitesinin hesaplanmış stillerinden alınmıştır.
- * Değerler sitenin 14px tasarım tabanına göre yazılmıştır; rem değerleri --sidebar-rem ile yerel
- * piksele çevrilir; uygulamanın kök font boyutu değişmez.
+ * Kenar çubuğu: yapı Doping Hafıza web sitesinin hesaplanmış stillerinden alınmıştır. Site kök yazı
+ * boyutunu viewport'a göre 12-14px arasında ölçekler (masaüstünde ~250px genişlik); burada okunabilir
+ * 14px tabanla aynı orana daraltılmıştır. rem değerleri --sidebar-rem ile yerel piksele çevrilir;
+ * uygulamanın kök font boyutu değişmez.
  */
 @layer components {
   .sidebar {
     --sidebar-rem: 14px;
     flex-direction: column;
-    width: calc(20.71429 * var(--sidebar-rem));
-    padding: calc(2.5 * var(--sidebar-rem)) calc(1.28571 * var(--sidebar-rem)) calc(2.5 * var(--sidebar-rem))
-      calc(0.85714 * var(--sidebar-rem));
+    width: calc(17.85714 * var(--sidebar-rem));
+    padding: calc(2.5 * var(--sidebar-rem)) calc(0.85714 * var(--sidebar-rem));
     background-color: #fff;
     box-shadow: calc(0.28571 * var(--sidebar-rem)) calc(0.28571 * var(--sidebar-rem)) calc(1.14286 * var(--sidebar-rem))
       rgb(112 144 176 / 0.1);
@@ -208,9 +216,9 @@
   .sidebar-logo {
     display: block;
     flex-shrink: 0;
-    width: calc(16 * var(--sidebar-rem));
-    height: calc(3.71429 * var(--sidebar-rem));
-    margin: 0 0 calc(2.85714 * var(--sidebar-rem)) calc(0.71429 * var(--sidebar-rem));
+    width: calc(14.5 * var(--sidebar-rem));
+    height: calc(3.36607 * var(--sidebar-rem));
+    margin: 0 0 calc(2.28571 * var(--sidebar-rem)) calc(0.71429 * var(--sidebar-rem));
   }
 
   .sidebar-list {
@@ -222,7 +230,7 @@
   .sidebar-link {
     display: flex;
     align-items: center;
-    gap: calc(1.07143 * var(--sidebar-rem));
+    gap: calc(0.85714 * var(--sidebar-rem));
     width: 100%;
     padding-left: calc(0.71429 * var(--sidebar-rem));
     border-radius: calc(0.64286 * var(--sidebar-rem));
@@ -244,7 +252,7 @@
 
   /* Alt menü metni üst menü etiketleriyle aynı hizadan başlar (iç boşluk + ikon karesi + aralık). */
   .sidebar-sublink {
-    padding-left: calc((0.71429 + 2.14286 + 1.07143) * var(--sidebar-rem));
+    padding-left: calc((0.71429 + 2.14286 + 0.85714) * var(--sidebar-rem));
   }
 
   .sidebar-tile {
@@ -274,8 +282,8 @@
     display: block;
     min-width: 0;
     overflow: hidden;
-    padding-block: calc(1.07143 * var(--sidebar-rem));
-    font-size: calc(1.07143 * var(--sidebar-rem));
+    padding-block: calc(0.85714 * var(--sidebar-rem));
+    font-size: var(--sidebar-rem);
     font-weight: 400;
     line-height: 1;
     white-space: nowrap;
